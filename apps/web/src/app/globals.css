@@ -282,6 +282,22 @@ textarea {
   gap: 8px;
 }
 
+.login-options {
+  display: grid;
+  gap: 12px;
+  padding: 14px 0 0;
+  color: var(--muted);
+}
+
+.login-options summary {
+  cursor: pointer;
+  color: var(--cyan);
+}
+
+.login-options[open] summary {
+  margin-bottom: 12px;
+}
+
 .trial-note span,
 .next-action-card span {
   color: var(--muted);
@@ -303,6 +319,11 @@ textarea {
   min-height: 48px;
   padding: 12px 16px;
   font-weight: 700;
+}
+
+.primary-action {
+  min-height: 60px;
+  font-size: 18px;
 }
 
 .pixel-button {

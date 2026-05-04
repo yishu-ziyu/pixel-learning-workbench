@@ -45,15 +45,15 @@ The effect depends on turning claims and evidence into actions instead of summar
 const productPromise = [
   {
     title: "放入一篇难读材料",
-    body: "论文、报告、课程笔记都可以。先用示例文本试一遍，再换成自己的材料。",
+    body: "论文、报告、课程笔记都可以。你可以先看示例课，再换成自己的材料。",
   },
   {
-    title: "得到一节互动小课",
-    body: "系统会拆出论点、证据、概念和误解风险，变成一组需要回答的学习节点。",
+    title: "得到一条练习路径",
+    body: "系统会拆出论点、证据、概念和可能卡住的地方，整理成可跟着做的步骤。",
   },
   {
-    title: "用答题证明理解",
-    body: "你不是看摘要，而是完成追问、选择题和复盘，并自动生成后续回访。",
+    title: "按自己的节奏检查理解",
+    body: "你可以回答追问、做选择题、写复盘，也可以随时退出，稍后继续。",
   },
 ];
 
@@ -128,12 +128,12 @@ export function LearningWorkbench() {
   const currentRubricKeywords = currentActivity?.rubric?.expected_keywords ?? currentActivity?.expected_keywords ?? [];
   const incompleteRuns = runs.filter((run) => run.course_status !== "completed");
   const nextStep = !session
-    ? "一键试用"
+    ? "打开示例课"
     : !activeRun
-      ? "生成或继续课程"
+      ? "选择材料"
       : currentActivity
         ? `${formatActivityType(currentActivity.type)}：${currentActivity.title}`
-        : "查看复习计划";
+        : "查看复习";
 
   async function refreshDashboard(token = session?.session_token) {
     if (!token) return;
@@ -211,12 +211,32 @@ export function LearningWorkbench() {
     try {
       const response = await requestMagicLink(email);
       setMagicPreview({ token: response.preview_token, link: response.preview_link });
-      setInfoMessage("开发模式下，magic link 已直接生成。");
+      setInfoMessage("本地登录链接已生成。");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "发送 magic link 失败");
+      setError(cause instanceof Error ? cause.message : "生成本地登录链接失败");
     } finally {
       setIsBusy(false);
     }
+  }
+
+  async function createCourseFromSource(
+    token: string,
+    intentOverride?: LearningIntent,
+    source: { text?: string; file?: File | null } = {},
+  ) {
+    const file = source.file === undefined ? selectedFile : source.file;
+    const text = file ? undefined : source.text ?? inputText;
+    const asset = await createAsset({ text, file: file ?? undefined }, token);
+    const analyzed = await analyzeAsset(asset.asset_id, token);
+    setAnalyzeResult(analyzed);
+    const intent = intentOverride ?? analyzed.recommended_intent;
+    const blueprintResponse = await createBlueprint(asset.asset_id, intent, token);
+    setBlueprint(blueprintResponse.blueprint);
+    const run = await createCourseRun(asset.asset_id, intent, blueprintResponse.blueprint, token);
+    setActiveRun(run);
+    setFreeTextAnswer("");
+    setSelectedChoice(null);
+    await refreshDashboard(token);
   }
 
   async function handleStartDemo() {
@@ -235,23 +255,35 @@ export function LearningWorkbench() {
     }
   }
 
+  async function handleOpenSampleCourse() {
+    setIsBusy(true);
+    setError(null);
+    try {
+      const trialEmail = email.trim() || "learner@example.com";
+      setEmail(trialEmail);
+      setInputText(sampleText);
+      setSelectedFile(null);
+      const response = await requestMagicLink(trialEmail);
+      const verified = await verifyMagicLink(response.preview_token);
+      setSession(verified);
+      localStorage.setItem(sessionStorageKey, JSON.stringify(verified));
+      setMagicPreview(null);
+      await createCourseFromSource(verified.session_token, undefined, { text: sampleText, file: null });
+      setInfoMessage("示例课已准备好。你可以先走完一轮，再换成自己的材料。");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "打开示例课失败");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   async function handleGenerateCourse(intentOverride?: LearningIntent) {
     if (!session) return;
     setIsBusy(true);
     setError(null);
     try {
-      const asset = await createAsset({ text: selectedFile ? undefined : inputText, file: selectedFile ?? undefined }, session.session_token);
-      const analyzed = await analyzeAsset(asset.asset_id, session.session_token);
-      setAnalyzeResult(analyzed);
-      const intent = intentOverride ?? analyzed.recommended_intent;
-      const blueprintResponse = await createBlueprint(asset.asset_id, intent, session.session_token);
-      setBlueprint(blueprintResponse.blueprint);
-      const run = await createCourseRun(asset.asset_id, intent, blueprintResponse.blueprint, session.session_token);
-      setActiveRun(run);
-      setFreeTextAnswer("");
-      setSelectedChoice(null);
-      setInfoMessage("课程已生成。先做理解验证，而不是直接读总结。");
-      await refreshDashboard();
+      await createCourseFromSource(session.session_token, intentOverride);
+      setInfoMessage("练习已生成。你可以从第一步开始，也可以稍后继续。");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "生成课程失败");
     } finally {
@@ -332,9 +364,9 @@ export function LearningWorkbench() {
       <section className="hero-strip">
         <div>
           <p className="eyebrow">PIXEL LEARNING WORKBENCH</p>
-          <h1>把论文与长文，变成会逼你理解的像素课程。</h1>
+          <h1>把难读材料，变成一套可以跟着做的学习练习。</h1>
           <p className="hero-copy">
-            这不是摘要工具。它更像一个陪你读论文的练习教练：先拆材料，再出题追问，最后安排复习。
+            它适合论文、报告和课程笔记。你放入材料，系统帮你拆成练习步骤、理解检查和后续复习。
           </p>
           <div className="promise-grid" aria-label="产品能做什么">
             {productPromise.map((item, index) => (
@@ -354,12 +386,12 @@ export function LearningWorkbench() {
         </div>
         <div className="hero-stats">
           <div className="stat-card">
-            <span>你要放进去</span>
-            <strong>论文 / 长文</strong>
+            <span>最快开始</span>
+            <strong>打开示例课</strong>
           </div>
           <div className="stat-card">
-            <span>你会拿到</span>
-            <strong>互动小课</strong>
+            <span>也可以</span>
+            <strong>粘贴自己的材料</strong>
           </div>
           <div className="stat-card">
             <span>当前下一步</span>
@@ -371,26 +403,32 @@ export function LearningWorkbench() {
       {!session ? (
         <section className="login-shell panel">
           <div className="login-copy">
-            <p className="eyebrow">MAGIC LINK ACCESS</p>
-            <h2>进入你的学习工作台</h2>
-            <p>先进入工作台，系统才可以记住你的课程进度、答题结果和 D+1 / D+3 / D+7 回访。</p>
+            <p className="eyebrow">START</p>
+            <h2>先看一个完整例子</h2>
+            <p>你不需要先理解所有功能。打开示例课，跟着做一轮，就能看到它到底帮你完成什么。</p>
             <div className="trial-note">
-              <strong>最快路径</strong>
-              <span>直接点“一键试用”。不用收邮件，开发模式会自动完成登录。</span>
+              <strong>本地试用记录</strong>
+              <span>系统会在本机保存进度，方便你退出后继续。你可以随时退出。</span>
             </div>
           </div>
           <div className="login-form">
-            <label htmlFor="email">邮箱</label>
-            <input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" />
-            <button className="pixel-button" disabled={isBusy} onClick={handleStartDemo}>
-              {isBusy ? "进入中..." : "一键试用"}
+            <button className="pixel-button primary-action" disabled={isBusy} onClick={handleOpenSampleCourse}>
+              {isBusy ? "正在准备示例课..." : "打开示例课"}
             </button>
-            <button className="pixel-button" disabled={!email || isBusy} onClick={handleRequestMagicLink}>
-              {isBusy ? "生成中..." : "发送 magic link"}
+            <button className="secondary-button" disabled={isBusy} onClick={handleStartDemo}>
+              只进入工作台
             </button>
+            <details className="login-options">
+              <summary>使用指定邮箱</summary>
+              <label htmlFor="email">邮箱</label>
+              <input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" />
+              <button className="secondary-button" disabled={!email || isBusy} onClick={handleRequestMagicLink}>
+                生成本地登录链接
+              </button>
+            </details>
             {magicPreview ? (
               <div className="magic-preview">
-                <p>开发模式链接已生成。</p>
+                <p>本地登录链接已生成。</p>
                 <button className="secondary-button" onClick={() => completeLogin(magicPreview.token)}>
                   直接登录
                 </button>
@@ -429,15 +467,15 @@ export function LearningWorkbench() {
               <div className="panel-head">
                 <div>
                   <p className="eyebrow">UPLOAD / PASTE</p>
-                  <h3>第一步：放入你想读懂的材料</h3>
+                  <h3>放入你想读懂的材料</h3>
                 </div>
                 <button className="secondary-button" onClick={() => setInputText(sampleText)}>
                   加载示例
                 </button>
               </div>
               <div className="next-action-card">
-                <strong>你现在只需要做一件事</strong>
-                <span>保留示例文本，点击下方按钮。跑通后，再粘贴自己的论文、报告或课程笔记。</span>
+                <strong>当前建议</strong>
+                <span>如果你还在熟悉产品，就保留示例文本；如果已经知道要学什么，就直接粘贴自己的材料。</span>
               </div>
               <textarea
                 value={inputText}
@@ -468,7 +506,7 @@ export function LearningWorkbench() {
               <div className="panel-head">
                 <div>
                   <p className="eyebrow">COURSE STUDIO</p>
-                  <h3>第二步：确认系统怎么拆这份材料</h3>
+                  <h3>系统如何拆这份材料</h3>
                 </div>
               </div>
               {analyzeResult ? (
@@ -529,7 +567,7 @@ export function LearningWorkbench() {
               <div className="panel-head">
                 <div>
                   <p className="eyebrow">PLAY / LEARN</p>
-                  <h3>第三步：回答问题，证明自己真的懂了</h3>
+                  <h3>按步骤检查理解</h3>
                 </div>
               </div>
               {activeRun && currentActivity ? (
@@ -633,7 +671,7 @@ export function LearningWorkbench() {
               <div className="panel-head">
                 <div>
                   <p className="eyebrow">REVIEW / HISTORY</p>
-                  <h3>第四步：回来复习，不让理解消失</h3>
+                  <h3>历史记录与后续复习</h3>
                 </div>
               </div>
               <div className="review-columns">

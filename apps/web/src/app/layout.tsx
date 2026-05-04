@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "像素化深度学习工作台",
-  description: "把论文与长文，变成会逼你理解的像素剧情课程。",
+  description: "把论文、报告和课程笔记，变成可以跟着做的学习练习。",
 };
 
 export default function RootLayout({
