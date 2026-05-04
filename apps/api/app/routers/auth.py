@@ -12,13 +12,17 @@ from app.services.auth import consume_magic_link, issue_magic_link
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+def build_magic_preview_link(token: str) -> str:
+    return f"{settings.frontend_base_url.rstrip('/')}/?magic={token}"
+
+
 @router.post("/request-magic-link", response_model=MagicLinkResponse)
 def request_magic_link(payload: MagicLinkRequest, db: Session = Depends(get_db)) -> MagicLinkResponse:
     token = issue_magic_link(db, payload.email)
     return MagicLinkResponse(
         email=payload.email,
         preview_token=token.token,
-        preview_link=f"http://127.0.0.1:3000/?magic={token.token}",
+        preview_link=build_magic_preview_link(token.token),
         expires_at=token.expires_at,
     )
 

@@ -30,6 +30,13 @@ pnpm dev
 uv run --project apps/api uvicorn app.main:app --app-dir apps/api --reload --port 8000
 ```
 
+如果 `3000 / 8000` 已被占用，可以换成本机备用端口：
+
+```bash
+PIXEL_FRONTEND_BASE_URL=http://127.0.0.1:3011 uv run --project apps/api uvicorn app.main:app --app-dir apps/api --reload --port 8011
+NEXT_PUBLIC_API_BASE=http://127.0.0.1:8011/api pnpm --dir apps/web dev --hostname 127.0.0.1 --port 3011
+```
+
 启动后：
 
 - Web：<http://127.0.0.1:3000>
@@ -42,6 +49,7 @@ uv run --project apps/api uvicorn app.main:app --app-dir apps/api --reload --por
 - 数据库存储默认用 SQLite，但表结构与接口按后续切换 Postgres 的方式设计。
 - PDF 解析优先走文本层提取，若文本过少则尝试 `pdftotext`，再 fallback 到 `tesseract` OCR。
 - 学习内核通过 `model provider` 边界接入。当前默认 `PIXEL_MODEL_PROVIDER=heuristic`，后续真实模型应替换 provider，而不是改路由层。
+- 后端开发模式允许 `localhost / 127.0.0.1` 的任意端口通过 CORS；magic link 预览地址由 `PIXEL_FRONTEND_BASE_URL` 控制。
 
 ## 当前验证基线
 

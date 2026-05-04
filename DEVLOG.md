@@ -424,3 +424,10 @@ pnpm --dir apps/web build
 - 误解风险预测
 - 课程蓝图生成
 - 复盘评价
+
+## 2026-05-04 试用阻塞修复
+
+- 复现：前端临时跑在 `127.0.0.1:3011` 时，后端 `OPTIONS /api/auth/request-magic-link` 返回 `400 Bad Request`，浏览器登录第一步直接失败。
+- 根因：后端 CORS 只允许 `3000`；同时 magic link 预览地址硬编码为 `127.0.0.1:3000`，备用端口试用会继续跳错页面。
+- 修复：新增 `PIXEL_FRONTEND_BASE_URL`，magic link 预览地址改为配置驱动；CORS 开发模式允许 `localhost / 127.0.0.1` 任意端口。
+- 验证：`uv run --project apps/api pytest` 通过 `6 passed`；手工 API 链路完成 `magic link -> verify -> asset -> analyze -> blueprint -> course run -> event -> review plan`，后端日志全程 `200 OK`。

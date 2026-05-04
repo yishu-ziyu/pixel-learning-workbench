@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     session_ttl_hours: int = 168
     magic_link_ttl_minutes: int = 20
     cors_origins: list[str] = ["http://127.0.0.1:3000", "http://localhost:3000"]
+    cors_origin_regex: str | None = r"https?://(127\.0\.0\.1|localhost):\d+"
+    frontend_base_url: str = "http://127.0.0.1:3000"
     database_url: str | None = None
 
     model_config = SettingsConfigDict(env_prefix="PIXEL_", extra="ignore")
