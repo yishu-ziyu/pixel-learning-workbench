@@ -42,6 +42,21 @@ The interactive condition produces stronger transfer and better explanation qual
 Discussion
 The effect depends on turning claims and evidence into actions instead of summaries.`;
 
+const productPromise = [
+  {
+    title: "放入一篇难读材料",
+    body: "论文、报告、课程笔记都可以。先用示例文本试一遍，再换成自己的材料。",
+  },
+  {
+    title: "得到一节互动小课",
+    body: "系统会拆出论点、证据、概念和误解风险，变成一组需要回答的学习节点。",
+  },
+  {
+    title: "用答题证明理解",
+    body: "你不是看摘要，而是完成追问、选择题和复盘，并自动生成后续回访。",
+  },
+];
+
 function flattenActivities(blueprint?: CourseBlueprint): Activity[] {
   if (!blueprint) return [];
   return blueprint.chapters.flatMap((chapter) => chapter.activities);
@@ -319,8 +334,17 @@ export function LearningWorkbench() {
           <p className="eyebrow">PIXEL LEARNING WORKBENCH</p>
           <h1>把论文与长文，变成会逼你理解的像素课程。</h1>
           <p className="hero-copy">
-            输入尽可能少，系统自动完成解析、识别、推荐、课程生成与理解验证。总结只是附属物，不是主目标。
+            这不是摘要工具。它更像一个陪你读论文的练习教练：先拆材料，再出题追问，最后安排复习。
           </p>
+          <div className="promise-grid" aria-label="产品能做什么">
+            {productPromise.map((item, index) => (
+              <article key={item.title} className="promise-card">
+                <span>{index + 1}</span>
+                <strong>{item.title}</strong>
+                <p>{item.body}</p>
+              </article>
+            ))}
+          </div>
           <div className="journey-rail" aria-label="试用路径">
             <span className={!session ? "active" : ""}>1 进入</span>
             <span className={session && !activeRun ? "active" : ""}>2 建课</span>
@@ -330,12 +354,12 @@ export function LearningWorkbench() {
         </div>
         <div className="hero-stats">
           <div className="stat-card">
-            <span>输入方式</span>
-            <strong>文段 + 文件</strong>
+            <span>你要放进去</span>
+            <strong>论文 / 长文</strong>
           </div>
           <div className="stat-card">
-            <span>默认产物</span>
-            <strong>像素剧情课程</strong>
+            <span>你会拿到</span>
+            <strong>互动小课</strong>
           </div>
           <div className="stat-card">
             <span>当前下一步</span>
@@ -349,10 +373,10 @@ export function LearningWorkbench() {
           <div className="login-copy">
             <p className="eyebrow">MAGIC LINK ACCESS</p>
             <h2>进入你的学习工作台</h2>
-            <p>首版必须保留学习历史和复习计划，所以先通过开发模式 magic link 登录。</p>
+            <p>先进入工作台，系统才可以记住你的课程进度、答题结果和 D+1 / D+3 / D+7 回访。</p>
             <div className="trial-note">
               <strong>最快路径</strong>
-              <span>点“一键试用”会自动生成开发登录链接并进入工作台。</span>
+              <span>直接点“一键试用”。不用收邮件，开发模式会自动完成登录。</span>
             </div>
           </div>
           <div className="login-form">
@@ -405,15 +429,15 @@ export function LearningWorkbench() {
               <div className="panel-head">
                 <div>
                   <p className="eyebrow">UPLOAD / PASTE</p>
-                  <h3>最少输入，自动建课</h3>
+                  <h3>第一步：放入你想读懂的材料</h3>
                 </div>
                 <button className="secondary-button" onClick={() => setInputText(sampleText)}>
                   加载示例
                 </button>
               </div>
               <div className="next-action-card">
-                <strong>推荐试用顺序</strong>
-                <span>先用示例文本生成课程，再替换成自己的论文或长文。</span>
+                <strong>你现在只需要做一件事</strong>
+                <span>保留示例文本，点击下方按钮。跑通后，再粘贴自己的论文、报告或课程笔记。</span>
               </div>
               <textarea
                 value={inputText}
@@ -431,12 +455,12 @@ export function LearningWorkbench() {
                 </button>
               ) : null}
               <div className="intent-hints">
-                <span>论文 {"->"} 深度解读</span>
-                <span>论证文 {"->"} 逻辑拆解</span>
-                <span>教材笔记 {"->"} 课程化学习</span>
+                <span>论文：拆论点和证据</span>
+                <span>报告：抓结论和边界</span>
+                <span>笔记：变成练习课</span>
               </div>
               <button className="pixel-button" disabled={isBusy || (!selectedFile && inputText.trim().length < 80)} onClick={() => handleGenerateCourse()}>
-                {isBusy ? "生成中..." : "一键生成像素课程"}
+                {isBusy ? "生成中..." : "把这段材料变成练习课"}
               </button>
             </section>
 
@@ -444,7 +468,7 @@ export function LearningWorkbench() {
               <div className="panel-head">
                 <div>
                   <p className="eyebrow">COURSE STUDIO</p>
-                  <h3>解析结果与课程蓝图</h3>
+                  <h3>第二步：确认系统怎么拆这份材料</h3>
                 </div>
               </div>
               {analyzeResult ? (
@@ -497,7 +521,7 @@ export function LearningWorkbench() {
                   ) : null}
                 </>
               ) : (
-                <p className="empty-state">这里会显示材料识别结果、学习模式、章节地图和误解风险。</p>
+                <p className="empty-state">生成后，这里会显示它把材料识别成什么、建议用什么学习方式、会拆成几章几道练习。</p>
               )}
             </section>
 
@@ -505,7 +529,7 @@ export function LearningWorkbench() {
               <div className="panel-head">
                 <div>
                   <p className="eyebrow">PLAY / LEARN</p>
-                  <h3>不是读完，而是被迫理解</h3>
+                  <h3>第三步：回答问题，证明自己真的懂了</h3>
                 </div>
               </div>
               {activeRun && currentActivity ? (
@@ -601,7 +625,7 @@ export function LearningWorkbench() {
               ) : activeRun && activeRun.course_status === "completed" ? (
                 <p className="empty-state">这轮课程已完成。右侧已经生成回访计划，下一步是复盘与迁移，而不是停在总结。</p>
               ) : (
-                <p className="empty-state">生成课程后，这里会出现剧情场景、追问、挑战与复盘节点。</p>
+                <p className="empty-state">生成课程后，这里会直接出现第一个学习节点。你需要选择、回答或复盘，系统会根据结果推进进度。</p>
               )}
             </section>
 
@@ -609,7 +633,7 @@ export function LearningWorkbench() {
               <div className="panel-head">
                 <div>
                   <p className="eyebrow">REVIEW / HISTORY</p>
-                  <h3>掌握度、历史记录与回访计划</h3>
+                  <h3>第四步：回来复习，不让理解消失</h3>
                 </div>
               </div>
               <div className="review-columns">

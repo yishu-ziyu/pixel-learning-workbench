@@ -439,3 +439,10 @@ pnpm --dir apps/web build
 - 修复：在 root layout 增加 `beforeInteractive` 扩展错误过滤器，拦截 `chrome-extension://` 来源的 `error` / `unhandledrejection`，避免第三方扩展异常进入页面错误层。
 - 产品化补强：默认填入试用邮箱，新增“一键试用”、四步路径提示、当前下一步、推荐试用顺序、继续学习入口，降低首次使用阻力并强化回访闭环。
 - 验证：`uv run --project apps/api pytest`、`pnpm --dir apps/web lint`、`pnpm --dir apps/web build` 通过；开发页 HTML 已包含 `extension-error-filter` 和“一键试用”入口。
+
+## 2026-05-05 产品理解入口修复
+
+- 复现：用户反馈“没用懂这款产品”，说明首屏仍在讲抽象能力，没有把用户任务说清楚。
+- 调整：把产品定义改成“不是摘要工具，而是陪你读论文的练习教练”；首屏改为三步承诺：放入难读材料、得到互动小课、用答题证明理解。
+- 调整：把输入区标题改为“第一步：放入你想读懂的材料”，主按钮改为“把这段材料变成练习课”，并明确论文、报告、笔记分别会被怎样处理。
+- 验证：`pnpm --dir apps/web lint`、`pnpm --dir apps/web build` 通过；开发页 HTML 已包含新的首屏解释和 CTA 文案。

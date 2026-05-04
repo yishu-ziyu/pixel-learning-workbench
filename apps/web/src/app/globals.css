@@ -123,6 +123,7 @@ h3 {
 
 .hero-stats,
 .meta-grid,
+.promise-grid,
 .chip-row,
 .intent-hints,
 .journey-rail,
@@ -139,6 +140,40 @@ h3 {
 
 .hero-stats {
   grid-template-columns: 1fr;
+}
+
+.promise-grid {
+  margin-top: 22px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.promise-card {
+  min-height: 156px;
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  border-radius: 18px;
+  border: 1px solid rgba(126, 220, 255, 0.12);
+  background: rgba(8, 13, 21, 0.48);
+}
+
+.promise-card > span {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: #0d1321;
+  background: var(--mint);
+  font-family: var(--pixel-font);
+  font-weight: 700;
+}
+
+.promise-card p {
+  color: var(--muted);
+  line-height: 1.55;
+  font-size: 14px;
 }
 
 .journey-rail {
@@ -541,6 +576,7 @@ textarea {
 @media (max-width: 1180px) {
   .hero-strip,
   .login-shell,
+  .promise-grid,
   .workspace-grid,
   .review-columns {
     grid-template-columns: 1fr;
