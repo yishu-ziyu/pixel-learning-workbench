@@ -77,9 +77,20 @@ function relativeDue(dateString: string): string {
   return `${Math.round(hours / 24)} 天后`;
 }
 
+function formatActivityType(type: string): string {
+  const labels: Record<string, string> = {
+    scene: "剧情",
+    explain: "讲解",
+    probe: "追问",
+    challenge: "挑战",
+    reflect: "复盘",
+  };
+  return labels[type] ?? type;
+}
+
 export function LearningWorkbench() {
   const [session, setSession] = useState<SessionResponse | null>(null);
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState("learner@example.com");
   const [magicPreview, setMagicPreview] = useState<{ token: string; link: string } | null>(null);
   const [inputText, setInputText] = useState(sampleText);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -100,6 +111,14 @@ export function LearningWorkbench() {
   const progressRatio = activeRun && activities.length > 0 ? activeRun.current_activity_index / activities.length : 0;
   const currentRubricFacets = currentActivity?.rubric?.required_facets ?? [];
   const currentRubricKeywords = currentActivity?.rubric?.expected_keywords ?? currentActivity?.expected_keywords ?? [];
+  const incompleteRuns = runs.filter((run) => run.course_status !== "completed");
+  const nextStep = !session
+    ? "一键试用"
+    : !activeRun
+      ? "生成或继续课程"
+      : currentActivity
+        ? `${formatActivityType(currentActivity.type)}：${currentActivity.title}`
+        : "查看复习计划";
 
   async function refreshDashboard(token = session?.session_token) {
     if (!token) return;
@@ -185,6 +204,22 @@ export function LearningWorkbench() {
     }
   }
 
+  async function handleStartDemo() {
+    setIsBusy(true);
+    setError(null);
+    try {
+      const trialEmail = email.trim() || "learner@example.com";
+      setEmail(trialEmail);
+      const response = await requestMagicLink(trialEmail);
+      setMagicPreview({ token: response.preview_token, link: response.preview_link });
+      await completeLogin(response.preview_token);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "启动试用失败");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   async function handleGenerateCourse(intentOverride?: LearningIntent) {
     if (!session) return;
     setIsBusy(true);
@@ -260,6 +295,12 @@ export function LearningWorkbench() {
     }
   }
 
+  async function handleResumeLatestRun() {
+    const nextRun = incompleteRuns[0] ?? runs[0];
+    if (!nextRun) return;
+    await selectRun(nextRun.id);
+  }
+
   function resetSession() {
     setSession(null);
     setMagicPreview(null);
@@ -280,6 +321,12 @@ export function LearningWorkbench() {
           <p className="hero-copy">
             输入尽可能少，系统自动完成解析、识别、推荐、课程生成与理解验证。总结只是附属物，不是主目标。
           </p>
+          <div className="journey-rail" aria-label="试用路径">
+            <span className={!session ? "active" : ""}>1 进入</span>
+            <span className={session && !activeRun ? "active" : ""}>2 建课</span>
+            <span className={activeRun && currentActivity ? "active" : ""}>3 验证</span>
+            <span className={reviewPlans.length ? "active" : ""}>4 回访</span>
+          </div>
         </div>
         <div className="hero-stats">
           <div className="stat-card">
@@ -291,8 +338,8 @@ export function LearningWorkbench() {
             <strong>像素剧情课程</strong>
           </div>
           <div className="stat-card">
-            <span>闭环目标</span>
-            <strong>学习 {"->"} 回访</strong>
+            <span>当前下一步</span>
+            <strong>{nextStep}</strong>
           </div>
         </div>
       </section>
@@ -303,10 +350,17 @@ export function LearningWorkbench() {
             <p className="eyebrow">MAGIC LINK ACCESS</p>
             <h2>进入你的学习工作台</h2>
             <p>首版必须保留学习历史和复习计划，所以先通过开发模式 magic link 登录。</p>
+            <div className="trial-note">
+              <strong>最快路径</strong>
+              <span>点“一键试用”会自动生成开发登录链接并进入工作台。</span>
+            </div>
           </div>
           <div className="login-form">
             <label htmlFor="email">邮箱</label>
             <input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" />
+            <button className="pixel-button" disabled={isBusy} onClick={handleStartDemo}>
+              {isBusy ? "进入中..." : "一键试用"}
+            </button>
             <button className="pixel-button" disabled={!email || isBusy} onClick={handleRequestMagicLink}>
               {isBusy ? "生成中..." : "发送 magic link"}
             </button>
@@ -332,6 +386,11 @@ export function LearningWorkbench() {
             </div>
             <div className="toolbar-meta">
               <span>{session.user.email}</span>
+              {runs.length ? (
+                <button className="secondary-button" onClick={handleResumeLatestRun} disabled={isBusy}>
+                  继续学习
+                </button>
+              ) : null}
               <button className="secondary-button" onClick={resetSession}>
                 退出
               </button>
@@ -351,6 +410,10 @@ export function LearningWorkbench() {
                 <button className="secondary-button" onClick={() => setInputText(sampleText)}>
                   加载示例
                 </button>
+              </div>
+              <div className="next-action-card">
+                <strong>推荐试用顺序</strong>
+                <span>先用示例文本生成课程，再替换成自己的论文或长文。</span>
               </div>
               <textarea
                 value={inputText}
@@ -466,7 +529,7 @@ export function LearningWorkbench() {
                     </div>
                   </div>
                   <div className="activity-card">
-                    <span className="activity-type">{currentActivity.type}</span>
+                    <span className="activity-type">{formatActivityType(currentActivity.type)}</span>
                     <h4>{currentActivity.title}</h4>
                     <p>{currentActivity.body}</p>
                     {currentActivity.rubric?.passing_note ? <p className="learning-note">{currentActivity.rubric.passing_note}</p> : null}

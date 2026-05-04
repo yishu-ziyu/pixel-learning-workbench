@@ -431,3 +431,11 @@ pnpm --dir apps/web build
 - 根因：后端 CORS 只允许 `3000`；同时 magic link 预览地址硬编码为 `127.0.0.1:3000`，备用端口试用会继续跳错页面。
 - 修复：新增 `PIXEL_FRONTEND_BASE_URL`，magic link 预览地址改为配置驱动；CORS 开发模式允许 `localhost / 127.0.0.1` 任意端口。
 - 验证：`uv run --project apps/api pytest` 通过 `6 passed`；手工 API 链路完成 `magic link -> verify -> asset -> analyze -> blueprint -> course run -> event -> review plan`，后端日志全程 `200 OK`。
+
+## 2026-05-04 前端试用体验修复
+
+- 复现：用户真实浏览器打开页面后，Next dev overlay 报 `Maximum call stack size exceeded`，调用栈全部来自 `chrome-extension://jfed.../catch-script/search.js`。
+- 判断：直接异常源是第三方 Chrome 扩展的 content script，不是项目业务代码；但它会破坏首屏试用感受，必须在本地开发页隔离。
+- 修复：在 root layout 增加 `beforeInteractive` 扩展错误过滤器，拦截 `chrome-extension://` 来源的 `error` / `unhandledrejection`，避免第三方扩展异常进入页面错误层。
+- 产品化补强：默认填入试用邮箱，新增“一键试用”、四步路径提示、当前下一步、推荐试用顺序、继续学习入口，降低首次使用阻力并强化回访闭环。
+- 验证：`uv run --project apps/api pytest`、`pnpm --dir apps/web lint`、`pnpm --dir apps/web build` 通过；开发页 HTML 已包含 `extension-error-filter` 和“一键试用”入口。

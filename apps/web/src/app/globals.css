@@ -125,6 +125,7 @@ h3 {
 .meta-grid,
 .chip-row,
 .intent-hints,
+.journey-rail,
 .review-columns,
 .toolbar,
 .workspace-grid,
@@ -138,6 +139,29 @@ h3 {
 
 .hero-stats {
   grid-template-columns: 1fr;
+}
+
+.journey-rail {
+  margin-top: 22px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.journey-rail span {
+  min-height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(8, 13, 21, 0.54);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.journey-rail span.active {
+  color: #0d1321;
+  border-color: rgba(246, 197, 97, 0.5);
+  background: linear-gradient(180deg, var(--amber), #f59c5d);
 }
 
 .stat-card,
@@ -208,11 +232,25 @@ textarea {
 .cat-console,
 .blueprint-cover,
 .mastery-box,
-.activity-card {
+.activity-card,
+.trial-note,
+.next-action-card {
   border-radius: 20px;
   background: rgba(6, 10, 17, 0.62);
   border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 18px;
+}
+
+.trial-note,
+.next-action-card {
+  display: grid;
+  gap: 8px;
+}
+
+.trial-note span,
+.next-action-card span {
+  color: var(--muted);
+  line-height: 1.55;
 }
 
 .pixel-button,
