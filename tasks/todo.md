@@ -37,7 +37,7 @@
 - [x] 更新 Next metadata：应用名、manifest、Apple web app、theme color、Open Graph。
 - [x] 运行 lint/build，并验证 `/manifest.webmanifest`。
 - [x] 提交本轮改动。
-- [ ] 推送本轮改动。
+- [x] 推送本轮改动。
 
 ## 2026-05-05 串行流程页修复
 
@@ -47,7 +47,7 @@
 - [x] 在解析、生成路径、选择历史课程、完成课程等节点自动切换到对应功能页。
 - [x] 运行 lint/build/API 和浏览器交互验证，确认不会再同时展示全部功能面板。
 - [x] 提交本轮改动。
-- [ ] 推送本轮改动。
+- [x] 推送本轮改动。
 
 ## 验证标准
 
