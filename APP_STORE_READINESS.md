@@ -54,7 +54,7 @@ The current build records a local product funnel through `/api/analytics/events`
 
 | Funnel step | Event source | Evidence |
 | --- | --- | --- |
-| Open sample course | Web action | `first_run_sample_started` from `handleOpenSampleCourse` |
+| Open sample material | Web action | `first_run_sample_started` from `handleOpenSampleCourse` |
 | Material parsed | API action | `material_parsed` after `/assets/{asset_id}/analyze` succeeds |
 | Learning path generated | API action | `path_generated` after `/course-runs` succeeds |
 | First activity completed | API action | `first_activity_completed` when the first course activity advances |

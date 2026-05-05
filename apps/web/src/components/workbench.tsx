@@ -178,7 +178,7 @@ export function LearningWorkbench() {
     review: Boolean(session && (reviewPlans.length || activeRun?.course_status === "completed" || runs.some((run) => run.course_status === "completed"))),
   };
   const nextStep = !session
-    ? "打开示例课"
+    ? "打开示例材料"
     : !analyzeResult
       ? "输入并解析材料"
       : !activeRun
@@ -226,9 +226,9 @@ export function LearningWorkbench() {
     disabled?: boolean;
   } = !session
     ? {
-        label: isBusy ? "正在准备..." : "打开示例课",
-        title: "先跑通一份示例材料",
-        body: "不需要先配置账号。先走完整闭环，再换成自己的材料。",
+        label: isBusy ? "正在准备..." : "打开示例材料",
+        title: "先看系统如何检索一份材料",
+        body: "不需要先配置账号。先看材料结构，再决定是否转换成学习路径。",
         onSelect: handleOpenSampleCourse,
         disabled: isBusy,
       }
@@ -445,10 +445,12 @@ export function LearningWorkbench() {
       localStorage.setItem(sessionStorageKey, JSON.stringify(verified));
       setMagicPreview(null);
       await trackProductEvent("first_run_sample_started", { entry: "sample_course" }, verified.session_token);
-      await createCourseFromSource(verified.session_token, undefined, { text: sampleText, file: null });
-      setInfoMessage("示例课已准备好。你可以先走完一轮，再换成自己的材料。");
+      const prepared = await prepareMaterialFromSource(verified.session_token, { text: sampleText, file: null });
+      setInfoMessage(
+        `示例材料已解析：系统检索到 ${prepared.analyzed.learning_representation.argument_graph.length} 个结构节点。下一步你可以把它转成学习路径。`,
+      );
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "打开示例课失败");
+      setError(cause instanceof Error ? cause.message : "打开示例材料失败");
     } finally {
       setIsBusy(false);
     }
@@ -585,7 +587,7 @@ export function LearningWorkbench() {
           <div className="hero-stats">
             <div className="stat-card">
               <span>最快开始</span>
-              <strong>打开示例课</strong>
+              <strong>打开示例材料</strong>
             </div>
             <div className="stat-card">
               <span>也可以</span>
@@ -615,7 +617,7 @@ export function LearningWorkbench() {
           <div className="login-copy">
             <p className="eyebrow">START</p>
             <h2>先看一个完整例子</h2>
-            <p>你不需要先理解所有功能。打开示例课，跟着做一轮，就能看到它到底帮你完成什么。</p>
+            <p>你不需要先理解所有功能。打开示例材料，先看系统如何检索结构，再亲手把它转换成学习路径。</p>
             <div className="trial-note">
               <strong>本地试用记录</strong>
               <span>系统会在本机保存进度，方便你退出后继续。你可以随时退出。</span>
@@ -623,7 +625,7 @@ export function LearningWorkbench() {
           </div>
           <div className="login-form">
             <button className="pixel-button primary-action" disabled={isBusy} onClick={handleOpenSampleCourse}>
-              {isBusy ? "正在准备示例课..." : "打开示例课"}
+              {isBusy ? "正在解析示例材料..." : "打开示例材料"}
             </button>
             <button className="secondary-button" disabled={isBusy} onClick={handleStartDemo}>
               只进入工作台

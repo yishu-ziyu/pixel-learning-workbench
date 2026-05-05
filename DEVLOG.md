@@ -455,7 +455,7 @@ pnpm --dir apps/web build
 - 本轮选择：优先补“用户是否真的走完学习闭环”的基础漏斗，因为它直接影响试用、留存和后续 App Store 页面优化判断。
 - 后端新增：`ProductEvent` 数据模型、`/api/analytics/events` 手动事件、`/api/analytics/funnel` 当前用户漏斗汇总。
 - 自动埋点：材料解析完成、学习路径生成、首个学习节点完成、D+1 回访完成都由 API 端记录，减少前端漏报。
-- 前端埋点：打开示例课时记录 `first_run_sample_started`。
+- 前端埋点：打开示例材料时记录 `first_run_sample_started`。
 - 后续限制：这只是本地产品漏斗，不等于生产 analytics；下一阶段仍需要 install source、D+1/D+7 留存、转化率、cohort 和商店素材实验数据。
 
 ## 2026-05-05 商店素材基础包
@@ -464,3 +464,10 @@ pnpm --dir apps/web build
 - 新增 `STORE_ASSETS.md`，固定产品名、subtitle、promotional text、关键词假设、6 张 iPhone 截图 storyboard、3 个 Product Page Optimization 变体和 30 秒 app preview 脚本。
 - 新增 `/store-preview` 静态素材预览页，用同一套视觉系统展示 6 个截图构图方向，后续可作为真实 native app state 截图的构图参考。
 - 后续限制：这仍是 draft creative kit，不是最终 App Store Connect 资产；最终还需要 native build、真实设备截图、iPad 截图、导出视频和本地化元数据。
+
+## 2026-05-05 核心试用顺序修复
+
+- 用户澄清：暂时不用继续管 App Store 上线事项，“App Store 前十”只是质量激励。执行方向切回产品本体。
+- 产品判断：首次点击“打开示例课”直接生成学习路径太快，会跳过“材料先被检索、再被转换”的关键认知过程。
+- 调整：首次 CTA 改为“打开示例材料”；点击后只完成本地登录和样例材料检索，停在检索结果页。
+- 预期：用户先看到系统读到了什么，再主动点击“转成学习路径”，更符合串行使用顺序，也更尊重用户理解节奏。
