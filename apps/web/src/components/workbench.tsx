@@ -27,6 +27,7 @@ import type {
 } from "@/types/api";
 
 const sessionStorageKey = "pixel-learning-session";
+type WorkbenchStage = "input" | "retrieval" | "path" | "review";
 const sampleText = `Abstract
 This paper studies how game-based micro-learning improves long-term retention for complex reading tasks.
 
@@ -143,6 +144,7 @@ export function LearningWorkbench() {
   const [confidence, setConfidence] = useState<"low" | "medium" | "high">("medium");
   const [freeTextAnswer, setFreeTextAnswer] = useState("");
   const [selectedChoice, setSelectedChoice] = useState<number | null>(null);
+  const [activeStage, setActiveStage] = useState<WorkbenchStage>("input");
 
   const activities = useMemo(() => flattenActivities(activeRun?.blueprint), [activeRun]);
   const currentActivity = activeRun ? activities[activeRun.current_activity_index] ?? null : null;
@@ -167,6 +169,12 @@ export function LearningWorkbench() {
       : textLength > 0
         ? { title: "文本偏短", detail: `当前 ${textLength} 字，至少需要 80 字` }
         : { title: "等待材料", detail: "粘贴文本或上传文件" };
+  const stageAvailability: Record<WorkbenchStage, boolean> = {
+    input: Boolean(session),
+    retrieval: Boolean(session && analyzeResult),
+    path: Boolean(session && activeRun),
+    review: Boolean(session && (reviewPlans.length || activeRun?.course_status === "completed" || runs.some((run) => run.course_status === "completed"))),
+  };
   const nextStep = !session
     ? "打开示例课"
     : !analyzeResult
@@ -178,11 +186,13 @@ export function LearningWorkbench() {
         : "查看复习";
   const workflowStatus = [
     {
+      stage: "input" as const,
       label: "输入材料",
       body: selectedFile ? selectedFile.name : inputText.trim() ? `${inputText.trim().length} 字文本` : "等待材料",
       state: session ? (analyzeResult ? "done" : "active") : "pending",
     },
     {
+      stage: "retrieval" as const,
       label: "检索结构",
       body: analyzeResult
         ? `${analyzeResult.learning_representation.argument_graph.length} 个结构节点`
@@ -190,14 +200,20 @@ export function LearningWorkbench() {
       state: analyzeResult ? (activeRun ? "done" : "active") : "pending",
     },
     {
-      label: "生成路径",
-      body: blueprint ? `${blueprint.cover.chapter_count} 章 / ${blueprint.cover.activity_count} 个节点` : "等待转换",
-      state: activeRun ? "done" : analyzeResult ? "active" : "pending",
+      stage: "path" as const,
+      label: "学习路径",
+      body: currentActivity
+        ? currentActivity.title
+        : blueprint
+          ? `${blueprint.cover.chapter_count} 章 / ${blueprint.cover.activity_count} 个节点`
+          : "等待转换",
+      state: activeRun ? (currentActivity ? "active" : "done") : analyzeResult ? "active" : "pending",
     },
     {
-      label: "开始学习",
-      body: currentActivity ? currentActivity.title : reviewPlans.length ? "查看复习计划" : "等待学习节点",
-      state: activeRun ? (currentActivity || reviewPlans.length ? "active" : "done") : "pending",
+      stage: "review" as const,
+      label: "复习回访",
+      body: reviewPlans.length ? "查看复习计划" : activeRun?.course_status === "completed" ? "查看掌握度" : "学习完成后出现",
+      state: reviewPlans.length || activeRun?.course_status === "completed" ? "active" : activeRun ? "pending" : "pending",
     },
   ];
   const primaryCommand: {
@@ -259,6 +275,7 @@ export function LearningWorkbench() {
   async function completeLogin(token: string) {
     const verified = await verifyMagicLink(token);
     setSession(verified);
+    setActiveStage("input");
     localStorage.setItem(sessionStorageKey, JSON.stringify(verified));
     setMagicPreview(null);
     setInfoMessage(`欢迎回来，${verified.user.display_name}。`);
@@ -281,6 +298,7 @@ export function LearningWorkbench() {
       verifyMagicLink(magic)
         .then(async (verified) => {
           setSession(verified);
+          setActiveStage("input");
           localStorage.setItem(sessionStorageKey, JSON.stringify(verified));
           setMagicPreview(null);
           setInfoMessage(`欢迎回来，${verified.user.display_name}。`);
@@ -313,6 +331,7 @@ export function LearningWorkbench() {
       const run = await getCourseRun(runId, session.session_token);
       setActiveRun(run);
       setBlueprint(run.blueprint);
+      setActiveStage(run.course_status === "completed" ? "review" : "path");
       setInfoMessage(`已切换到课程：${run.title}`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "读取课程失败");
@@ -351,6 +370,7 @@ export function LearningWorkbench() {
     setAnalyzeResult(analyzed);
     setBlueprint(null);
     setActiveRun(null);
+    setActiveStage("retrieval");
     setFreeTextAnswer("");
     setSelectedChoice(null);
     return { assetId: asset.asset_id, analyzed };
@@ -367,6 +387,7 @@ export function LearningWorkbench() {
     setBlueprint(blueprintResponse.blueprint);
     const run = await createCourseRun(assetId, intent, blueprintResponse.blueprint, token);
     setActiveRun(run);
+    setActiveStage("path");
     setFreeTextAnswer("");
     setSelectedChoice(null);
     await refreshDashboard(token);
@@ -377,6 +398,7 @@ export function LearningWorkbench() {
     setAnalyzeResult(null);
     setBlueprint(null);
     setActiveRun(null);
+    setActiveStage("input");
     setFreeTextAnswer("");
     setSelectedChoice(null);
   }
@@ -408,6 +430,7 @@ export function LearningWorkbench() {
       const response = await requestMagicLink(trialEmail);
       const verified = await verifyMagicLink(response.preview_token);
       setSession(verified);
+      setActiveStage("input");
       localStorage.setItem(sessionStorageKey, JSON.stringify(verified));
       setMagicPreview(null);
       await createCourseFromSource(verified.session_token, undefined, { text: sampleText, file: null });
@@ -478,6 +501,9 @@ export function LearningWorkbench() {
       );
       setActiveRun(response.course_run);
       setBlueprint(response.course_run.blueprint);
+      if (response.course_run.course_status === "completed") {
+        setActiveStage("review");
+      }
       setFreeTextAnswer("");
       setSelectedChoice(null);
       setInfoMessage(response.result.feedback);
@@ -496,6 +522,7 @@ export function LearningWorkbench() {
     try {
       const result = await completeReviewPlan(reviewId, session.session_token);
       setInfoMessage(result.message);
+      setActiveStage("review");
       await refreshDashboard();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "完成复习失败");
@@ -519,6 +546,7 @@ export function LearningWorkbench() {
     setActiveRun(null);
     setRuns([]);
     setReviewPlans([]);
+    setActiveStage("input");
     localStorage.removeItem(sessionStorageKey);
   }
 
@@ -634,11 +662,17 @@ export function LearningWorkbench() {
 
           <section className="workflow-status" aria-label="当前工作流状态">
             {workflowStatus.map((step, index) => (
-              <article key={step.label} className={`flow-step ${step.state}`}>
+              <button
+                key={step.label}
+                className={`flow-step ${step.state} ${activeStage === step.stage ? "selected" : ""}`}
+                disabled={!stageAvailability[step.stage]}
+                onClick={() => setActiveStage(step.stage)}
+                type="button"
+              >
                 <span>{String(index + 1).padStart(2, "0")}</span>
                 <strong>{step.label}</strong>
                 <p>{step.body}</p>
-              </article>
+              </button>
             ))}
           </section>
 
@@ -655,8 +689,8 @@ export function LearningWorkbench() {
             ) : null}
           </section>
 
-          <div className="workspace-grid">
-            <section className="panel input-panel">
+          <div className="workspace-grid serial-workspace">
+            <section className={activeStage === "input" ? "panel input-panel active-stage-panel" : "panel input-panel hidden-stage-panel"}>
               <div className="panel-head">
                 <div>
                   <p className="eyebrow">1 MATERIAL INPUT</p>
@@ -729,7 +763,7 @@ export function LearningWorkbench() {
               ) : null}
             </section>
 
-            <section className="panel studio-panel">
+            <section className={activeStage === "retrieval" ? "panel studio-panel active-stage-panel" : "panel studio-panel hidden-stage-panel"}>
               <div className="panel-head">
                 <div>
                   <p className="eyebrow">2 MATERIAL RETRIEVAL</p>
@@ -862,7 +896,7 @@ export function LearningWorkbench() {
               )}
             </section>
 
-            <section className="panel play-panel">
+            <section className={activeStage === "path" ? "panel play-panel active-stage-panel" : "panel play-panel hidden-stage-panel"}>
               <div className="panel-head">
                 <div>
                   <p className="eyebrow">3 LEARNING PATH</p>
@@ -973,7 +1007,7 @@ export function LearningWorkbench() {
               )}
             </section>
 
-            <section className="panel review-panel">
+            <section className={activeStage === "review" ? "panel review-panel active-stage-panel" : "panel review-panel hidden-stage-panel"}>
               <div className="panel-head">
                 <div>
                   <p className="eyebrow">4 REVIEW / HISTORY</p>

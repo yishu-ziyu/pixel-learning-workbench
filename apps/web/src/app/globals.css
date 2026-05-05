@@ -188,6 +188,10 @@ h3 {
   border-radius: var(--radius);
   border: 1px solid var(--panel-border);
   background: rgba(255, 255, 255, 0.72);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease, transform 120ms ease;
 }
 
 .flow-step > span {
@@ -226,6 +230,27 @@ h3 {
 .flow-step.done {
   border-color: rgba(37, 111, 159, 0.22);
   background: #f3f7fa;
+}
+
+.flow-step.selected {
+  border-color: rgba(15, 143, 120, 0.64);
+  background: #e6f5f0;
+  box-shadow: 0 0 0 3px rgba(15, 143, 120, 0.12);
+}
+
+.flow-step.selected > span {
+  background: var(--mint);
+  color: #ffffff;
+}
+
+.flow-step:not(:disabled):hover {
+  transform: translateY(-1px);
+  border-color: rgba(15, 143, 120, 0.48);
+}
+
+.flow-step:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
 }
 
 .hero-stats {
@@ -521,6 +546,10 @@ textarea {
   align-items: start;
 }
 
+.serial-workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .panel {
   padding: 18px;
 }
@@ -536,6 +565,22 @@ textarea {
 
 .workspace-grid > .panel:nth-child(4) {
   grid-column: 1 / -1;
+}
+
+.serial-workspace > .panel,
+.serial-workspace > .panel:nth-child(1),
+.serial-workspace > .panel:nth-child(4) {
+  grid-column: auto;
+  grid-row: auto;
+}
+
+.active-stage-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.hidden-stage-panel {
+  display: none;
 }
 
 .panel-head {

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Material Learning Converter icon</title>
+  <desc id="desc">A focused reading path mark with PX letters.</desc>
+  <rect width="512" height="512" rx="96" fill="#0f8f78"/>
+  <path d="M116 148h136c56 0 92 32 92 82 0 51-36 84-92 84h-48v72h-88V148Zm88 72v26h42c12 0 20-5 20-14 0-8-8-12-20-12h-42Z" fill="#ffffff"/>
+  <path d="M310 148h92l-70 116 76 122h-96l-32-58-34 58h-92l78-122-72-116h96l28 52 30-52Z" fill="#dff5ef"/>
+  <path d="M112 414h288" stroke="#dff5ef" stroke-width="22" stroke-linecap="round"/>
+</svg>

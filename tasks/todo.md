@@ -29,6 +29,26 @@
 - [x] 运行前端 lint、build 和页面验证。
 - [x] 提交并推送本轮改动。
 
+## 2026-05-05 App Store readiness 基础层
+
+- [x] 查阅 Apple 官方产品页、产品页优化、custom product pages 和 App Analytics 资料。
+- [x] 新增 `APP_STORE_READINESS.md`，把目标拆成 prompt-to-artifact 检查表和缺口清单。
+- [x] 新增 Web app manifest 与基础图标：`apps/web/src/app/manifest.ts`、`apps/web/public/icon.svg`。
+- [x] 更新 Next metadata：应用名、manifest、Apple web app、theme color、Open Graph。
+- [x] 运行 lint/build，并验证 `/manifest.webmanifest`。
+- [x] 提交本轮改动。
+- [ ] 推送本轮改动。
+
+## 2026-05-05 串行流程页修复
+
+- [x] 确认当前问题：登录后把材料输入、检索结果、学习路径、复习历史全部堆在同一屏，破坏用户顺序感。
+- [x] 将工作台改为四个串行功能页：输入材料、检索结构、学习路径、复习回访。
+- [x] 将顶部四步状态条改成流程导航，只允许进入已经解锁的阶段。
+- [x] 在解析、生成路径、选择历史课程、完成课程等节点自动切换到对应功能页。
+- [x] 运行 lint/build/API 和浏览器交互验证，确认不会再同时展示全部功能面板。
+- [x] 提交本轮改动。
+- [ ] 推送本轮改动。
+
 ## 验证标准
 
 - 页面首屏能直接说明产品是材料学习转换器，而不是抽象课程工作台。
