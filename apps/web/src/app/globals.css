@@ -10,7 +10,7 @@
   --amber: #b4641f;
   --danger: #b54747;
   --shadow: 0 16px 46px rgba(36, 50, 43, 0.09);
-  --radius: 14px;
+  --radius: 8px;
   --pixel-font: "Courier New", monospace;
   --ui-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -115,14 +115,16 @@ a {
 .mastery-row p,
 .retrieval-summary p,
 .source-card p,
-.format-strip span {
+.format-strip span,
+.command-bar p,
+.material-readiness p {
   color: var(--muted);
   line-height: 1.65;
 }
 
 .eyebrow,
 .activity-type,
-.cat-role {
+.coach-role {
   font-family: var(--pixel-font);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -232,7 +234,7 @@ h3 {
 
 .promise-grid {
   margin-top: 22px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .promise-card {
@@ -352,7 +354,7 @@ textarea {
 }
 
 .magic-preview,
-.cat-console,
+.coach-console,
 .blueprint-cover,
 .mastery-box,
 .activity-card,
@@ -368,10 +370,52 @@ textarea {
   padding: 16px;
 }
 
+.command-bar {
+  margin-bottom: 14px;
+  padding: 16px 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  border-radius: var(--radius);
+  border: 1px solid rgba(15, 143, 120, 0.24);
+  background: #eef8f4;
+}
+
+.command-bar span,
+.material-readiness span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.command-bar strong {
+  display: block;
+  margin: 4px 0;
+  font-size: 20px;
+}
+
+.command-button {
+  min-width: 160px;
+}
+
 .trial-note,
 .next-action-card {
   display: grid;
   gap: 8px;
+}
+
+.material-readiness {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(180, 100, 31, 0.22);
+  background: #fff8ef;
+}
+
+.material-readiness.ready {
+  border-color: rgba(15, 143, 120, 0.24);
+  background: #eef8f4;
 }
 
 .login-options {
@@ -571,21 +615,28 @@ textarea {
   background: linear-gradient(90deg, var(--cyan), var(--mint));
 }
 
-.cat-console {
+.coach-console {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 16px;
   align-items: center;
 }
 
-.cat-avatar {
+.coach-avatar {
   width: 54px;
   height: 54px;
   border-radius: 14px;
   display: grid;
   place-items: center;
-  font-size: 28px;
-  background: #f5eadf;
+  color: #ffffff;
+  font-family: var(--pixel-font);
+  font-weight: 700;
+  background: var(--cyan);
+}
+
+.empty-action {
+  display: flex;
+  margin-top: -4px;
 }
 
 .activity-card {
@@ -775,6 +826,7 @@ textarea {
   .promise-grid,
   .workspace-grid,
   .workflow-status,
+  .command-bar,
   .review-columns,
   .source-map {
     grid-template-columns: 1fr;
@@ -826,5 +878,9 @@ textarea {
   .format-strip {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .command-button {
+    width: 100%;
   }
 }

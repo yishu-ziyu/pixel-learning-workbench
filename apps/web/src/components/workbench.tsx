@@ -55,6 +55,10 @@ const productPromise = [
     title: "转成学习形态",
     body: "再把检索结果转换成练习路径、追问、选择题、复盘和后续复习计划。",
   },
+  {
+    title: "跟着练习复习",
+    body: "你需要回答、选择和复盘。系统根据结果推进下一步，并留下后续回访。",
+  },
 ];
 
 function flattenActivities(blueprint?: CourseBlueprint): Activity[] {
@@ -146,7 +150,23 @@ export function LearningWorkbench() {
   const currentRubricFacets = currentActivity?.rubric?.required_facets ?? [];
   const currentRubricKeywords = currentActivity?.rubric?.expected_keywords ?? currentActivity?.expected_keywords ?? [];
   const incompleteRuns = runs.filter((run) => run.course_status !== "completed");
+  const textLength = inputText.trim().length;
   const canUseMaterial = Boolean(selectedFile) || inputText.trim().length >= 80;
+  const canSubmitCurrentActivity =
+    Boolean(activeRun && currentActivity) &&
+    !isBusy &&
+    (currentActivity?.type === "challenge"
+      ? selectedChoice !== null
+      : currentActivity?.type === "probe" || currentActivity?.type === "reflect"
+        ? freeTextAnswer.trim().length >= 12
+        : true);
+  const materialReadiness = selectedFile
+    ? { title: "文件已就绪", detail: selectedFile.name }
+    : textLength >= 80
+      ? { title: "文本已就绪", detail: `${textLength} 字，可以开始解析` }
+      : textLength > 0
+        ? { title: "文本偏短", detail: `当前 ${textLength} 字，至少需要 80 字` }
+        : { title: "等待材料", detail: "粘贴文本或上传文件" };
   const nextStep = !session
     ? "打开示例课"
     : !analyzeResult
@@ -180,6 +200,54 @@ export function LearningWorkbench() {
       state: currentActivity || reviewPlans.length ? "active" : "pending",
     },
   ];
+  const primaryCommand: {
+    label: string;
+    title: string;
+    body: string;
+    onSelect?: () => void | Promise<void>;
+    disabled?: boolean;
+  } = !session
+    ? {
+        label: isBusy ? "正在准备..." : "打开示例课",
+        title: "先跑通一份示例材料",
+        body: "不需要先配置账号。先走完整闭环，再换成自己的材料。",
+        onSelect: handleOpenSampleCourse,
+        disabled: isBusy,
+      }
+    : !analyzeResult
+      ? {
+          label: isBusy ? "解析中..." : "解析材料",
+          title: "当前任务：让系统读材料",
+          body: materialReadiness.detail,
+          onSelect: handleAnalyzeMaterial,
+          disabled: isBusy || !canUseMaterial,
+        }
+      : !activeRun
+        ? {
+            label: isBusy ? "生成中..." : "转成学习路径",
+            title: "当前任务：选择学习形态",
+            body: `${analyzeResult.learning_representation.argument_graph.length} 个结构节点已就绪，可以生成练习路径。`,
+            onSelect: () => handleGenerateCourse(),
+            disabled: isBusy,
+          }
+        : currentActivity
+          ? {
+              label: "提交本步",
+              title: `当前任务：${currentActivity.title}`,
+              body:
+                currentActivity.type === "challenge"
+                  ? "选择一个答案后提交。"
+                  : currentActivity.type === "probe" || currentActivity.type === "reflect"
+                    ? "写出你的理解、证据和边界后提交。"
+                    : "阅读本步内容后继续推进。",
+              onSelect: handleSubmitCurrentActivity,
+              disabled: !canSubmitCurrentActivity,
+            }
+          : {
+              label: "查看复习",
+              title: "这轮学习已完成",
+              body: reviewPlans.length ? "后续回访已经生成，下一步是按计划复习。" : "等待新的材料或历史课程。",
+            };
 
   async function refreshDashboard(token = session?.session_token) {
     if (!token) return;
@@ -574,6 +642,19 @@ export function LearningWorkbench() {
             ))}
           </section>
 
+          <section className="command-bar" aria-label="当前任务">
+            <div>
+              <span>当前主任务</span>
+              <strong>{primaryCommand.title}</strong>
+              <p>{primaryCommand.body}</p>
+            </div>
+            {primaryCommand.onSelect ? (
+              <button className="pixel-button command-button" onClick={primaryCommand.onSelect} disabled={primaryCommand.disabled}>
+                {primaryCommand.label}
+              </button>
+            ) : null}
+          </section>
+
           <div className="workspace-grid">
             <section className="panel input-panel">
               <div className="panel-head">
@@ -595,6 +676,11 @@ export function LearningWorkbench() {
               <div className="next-action-card">
                 <strong>这一步只做一件事</strong>
                 <span>把原始材料放进来。系统下一步会先检索材料内部结构，不会直接把它伪装成一门课。</span>
+              </div>
+              <div className={canUseMaterial ? "material-readiness ready" : "material-readiness"}>
+                <span>输入状态</span>
+                <strong>{materialReadiness.title}</strong>
+                <p>{materialReadiness.detail}</p>
               </div>
               <textarea
                 value={inputText}
@@ -765,9 +851,14 @@ export function LearningWorkbench() {
                   ) : null}
                 </>
               ) : (
-                <p className="empty-state">
-                  解析材料后，这里会显示系统检索出的论点、证据、概念、可练习问题和误解风险。你先确认它读到了什么，再把它转成学习路径。
-                </p>
+                <>
+                  <p className="empty-state">解析材料后，这里会显示论点、证据、概念、可练习问题和误解风险。</p>
+                  <div className="empty-action">
+                    <button className="pixel-button compact-button" disabled={isBusy || !canUseMaterial} onClick={handleAnalyzeMaterial}>
+                      解析材料
+                    </button>
+                  </div>
+                </>
               )}
             </section>
 
@@ -789,12 +880,12 @@ export function LearningWorkbench() {
                     </span>
                     <span className="status-pill">{activeRun.course_status === "completed" ? "已完成" : "学习中"}</span>
                   </div>
-                  <div className="cat-console">
-                    <div className="cat-avatar">
-                      <span>ฅ</span>
+                  <div className="coach-console">
+                    <div className="coach-avatar">
+                      <span>PX</span>
                     </div>
                     <div>
-                      <p className="cat-role">像素小猫 / 学习引导角色</p>
+                      <p className="coach-role">学习引导</p>
                       <p>{activeRun.latest_guide_message}</p>
                     </div>
                   </div>
@@ -871,7 +962,14 @@ export function LearningWorkbench() {
               ) : activeRun && activeRun.course_status === "completed" ? (
                 <p className="empty-state">这轮课程已完成。右侧已经生成回访计划，下一步是复盘与迁移，而不是停在总结。</p>
               ) : (
-                <p className="empty-state">把材料检索结果转成学习路径后，这里会出现第一个学习节点。你需要选择、回答或复盘，系统会根据结果推进进度。</p>
+                <>
+                  <p className="empty-state">把材料检索结果转成学习路径后，这里会出现第一个学习节点。</p>
+                  <div className="empty-action">
+                    <button className="pixel-button compact-button" disabled={isBusy || !analyzeResult} onClick={() => handleGenerateCourse()}>
+                      转成学习路径
+                    </button>
+                  </div>
+                </>
               )}
             </section>
 
