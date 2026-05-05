@@ -684,9 +684,88 @@ textarea {
   margin-top: -4px;
 }
 
+.path-help-card,
+.current-action-card {
+  border: 1px solid rgba(15, 143, 120, 0.18);
+  background: #f1f8f5;
+}
+
+.path-help-card {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 18px;
+  align-items: center;
+  padding: 18px;
+  border-radius: 10px;
+}
+
+.path-help-card strong {
+  display: block;
+  margin-top: 6px;
+  line-height: 1.45;
+}
+
+.help-kicker {
+  color: var(--mint);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.path-help-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.path-help-steps li {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-height: 74px;
+  padding: 12px;
+  border: 1px solid rgba(26, 45, 39, 0.08);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.path-help-steps span {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #ffffff;
+  background: var(--mint);
+  font-family: var(--pixel-font);
+  font-size: 12px;
+}
+
 .activity-card {
   display: grid;
   gap: 14px;
+}
+
+.current-action-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 10px;
+}
+
+.current-action-card span {
+  color: var(--mint);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.current-action-card strong {
+  line-height: 1.5;
 }
 
 .learning-note,
@@ -1003,6 +1082,7 @@ textarea {
   .workspace-grid,
   .workflow-status,
   .command-bar,
+  .path-help-card,
   .review-columns,
   .source-map,
   .store-shot-grid,
@@ -1045,6 +1125,10 @@ textarea {
   .confidence-row,
   .mastery-row,
   .question-target {
+    grid-template-columns: 1fr;
+  }
+
+  .path-help-steps {
     grid-template-columns: 1fr;
   }
 

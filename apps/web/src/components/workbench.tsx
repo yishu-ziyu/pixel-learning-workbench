@@ -18,6 +18,7 @@ import {
 } from "@/lib/api";
 import type {
   Activity,
+  ActivityType,
   AnalyzeResponse,
   CourseBlueprint,
   CourseRun,
@@ -110,6 +111,37 @@ function formatActivityType(type: string): string {
   return labels[type] ?? type;
 }
 
+function activityInstruction(type: ActivityType): string {
+  const instructions: Record<ActivityType, string> = {
+    scene: "读完这张情境卡，确认自己知道材料正在讨论什么。",
+    explain: "读完这段最小讲解，抓住一个核心结论和它的依据。",
+    probe: "用自己的话写出理解，至少 12 字；重点写逻辑、证据或边界。",
+    challenge: "先选择一个答案，再提交；系统会根据结果继续推进。",
+    reflect: "写下本轮收获、卡住点或迁移场景，至少 12 字。",
+  };
+  return instructions[type];
+}
+
+function activitySubmitLabel(type: ActivityType): string {
+  const labels: Record<ActivityType, string> = {
+    scene: "我读懂了，进入下一步",
+    explain: "我读懂了，进入下一步",
+    probe: "提交回答并看反馈",
+    challenge: "提交选择并看反馈",
+    reflect: "提交复盘并生成回访",
+  };
+  return labels[type];
+}
+
+function formatConfidence(value: "low" | "medium" | "high"): string {
+  const labels: Record<"low" | "medium" | "high", string> = {
+    low: "没把握",
+    medium: "一般",
+    high: "有把握",
+  };
+  return labels[value];
+}
+
 function recordText(entry: Record<string, unknown>, key: string, fallback = ""): string {
   const value = entry[key];
   if (typeof value === "string") return value;
@@ -177,35 +209,36 @@ export function LearningWorkbench() {
     path: Boolean(session && activeRun),
     review: Boolean(session && (reviewPlans.length || activeRun?.course_status === "completed" || runs.some((run) => run.course_status === "completed"))),
   };
-  const nextStep = !session
-    ? "打开示例材料"
-    : !analyzeResult
-      ? "输入并解析材料"
-      : !activeRun
-        ? "转成学习路径"
-      : currentActivity
-        ? `${formatActivityType(currentActivity.type)}：${currentActivity.title}`
-        : "查看复习";
+  const nextStep = (() => {
+    if (!session) return "打开示例材料";
+    if (currentActivity) return `完成本步练习：${currentActivity.title}`;
+    if (activeRun?.course_status === "completed") return "查看复习";
+    if (!analyzeResult) return "输入并解析材料";
+    if (!activeRun) return "转成学习路径";
+    return "查看复习";
+  })();
   const workflowStatus = [
     {
       stage: "input" as const,
       label: "输入材料",
       body: selectedFile ? selectedFile.name : inputText.trim() ? `${inputText.trim().length} 字文本` : "等待材料",
-      state: session ? (analyzeResult ? "done" : "active") : "pending",
+      state: session ? (analyzeResult || activeRun ? "done" : "active") : "pending",
     },
     {
       stage: "retrieval" as const,
       label: "检索结构",
       body: analyzeResult
         ? `${analyzeResult.learning_representation.argument_graph.length} 个结构节点`
-        : "解析后显示论点、证据和概念",
-      state: analyzeResult ? (activeRun ? "done" : "active") : "pending",
+        : activeRun
+          ? "历史课程已生成"
+          : "解析后显示论点、证据和概念",
+      state: analyzeResult ? (activeRun ? "done" : "active") : activeRun ? "done" : "pending",
     },
     {
       stage: "path" as const,
-      label: "学习路径",
+      label: "跟着练习",
       body: currentActivity
-        ? currentActivity.title
+        ? `${formatActivityType(currentActivity.type)}：${activitySubmitLabel(currentActivity.type)}`
         : blueprint
           ? `${blueprint.cover.chapter_count} 章 / ${blueprint.cover.activity_count} 个节点`
           : "等待转换",
@@ -232,6 +265,14 @@ export function LearningWorkbench() {
         onSelect: handleOpenSampleCourse,
         disabled: isBusy,
       }
+    : currentActivity
+      ? {
+          label: activitySubmitLabel(currentActivity.type),
+          title: `当前任务：完成这一小步`,
+          body: activityInstruction(currentActivity.type),
+          onSelect: handleSubmitCurrentActivity,
+          disabled: !canSubmitCurrentActivity,
+        }
     : !analyzeResult
       ? {
           label: isBusy ? "解析中..." : "解析材料",
@@ -248,19 +289,6 @@ export function LearningWorkbench() {
             onSelect: () => handleGenerateCourse(),
             disabled: isBusy,
           }
-        : currentActivity
-          ? {
-              label: "提交本步",
-              title: `当前任务：${currentActivity.title}`,
-              body:
-                currentActivity.type === "challenge"
-                  ? "选择一个答案后提交。"
-                  : currentActivity.type === "probe" || currentActivity.type === "reflect"
-                    ? "写出你的理解、证据和边界后提交。"
-                    : "阅读本步内容后继续推进。",
-              onSelect: handleSubmitCurrentActivity,
-              disabled: !canSubmitCurrentActivity,
-            }
           : {
               label: "查看复习",
               title: "这轮学习已完成",
@@ -914,11 +942,31 @@ export function LearningWorkbench() {
               <div className="panel-head">
                 <div>
                   <p className="eyebrow">3 LEARNING PATH</p>
-                  <h3>按转换后的路径学习</h3>
+                  <h3>跟着卡片一步一步练习</h3>
                 </div>
               </div>
               {activeRun && currentActivity ? (
                 <>
+                  <div className="path-help-card">
+                    <div>
+                      <span className="help-kicker">第三步怎么用</span>
+                      <strong>这不是再看一份摘要，而是按卡片完成一个学习动作。</strong>
+                    </div>
+                    <ol className="path-help-steps">
+                      <li>
+                        <span>1</span>
+                        读当前卡片
+                      </li>
+                      <li>
+                        <span>2</span>
+                        按要求选择或作答
+                      </li>
+                      <li>
+                        <span>3</span>
+                        提交后自动进入下一节点
+                      </li>
+                    </ol>
+                  </div>
                   <div className="progress-strip">
                     <div className="progress-bar">
                       <div style={{ width: `${Math.min(100, Math.round(progressRatio * 100))}%` }} />
@@ -940,6 +988,10 @@ export function LearningWorkbench() {
                   <div className="activity-card">
                     <span className="activity-type">{formatActivityType(currentActivity.type)}</span>
                     <h4>{currentActivity.title}</h4>
+                    <div className="current-action-card">
+                      <span>当前你要做的是</span>
+                      <strong>{activityInstruction(currentActivity.type)}</strong>
+                    </div>
                     <p>{currentActivity.body}</p>
                     {currentActivity.rubric?.passing_note ? <p className="learning-note">{currentActivity.rubric.passing_note}</p> : null}
                     {currentRubricFacets.length || currentRubricKeywords.length ? (
@@ -990,7 +1042,7 @@ export function LearningWorkbench() {
                       <span>当前把握</span>
                       {(["low", "medium", "high"] as const).map((item) => (
                         <button key={item} className={confidence === item ? "confidence-pill active" : "confidence-pill"} onClick={() => setConfidence(item)}>
-                          {item}
+                          {formatConfidence(item)}
                         </button>
                       ))}
                     </div>
@@ -1003,7 +1055,7 @@ export function LearningWorkbench() {
                       }
                       onClick={handleSubmitCurrentActivity}
                     >
-                      提交本步学习结果
+                      {activitySubmitLabel(currentActivity.type)}
                     </button>
                   </div>
                 </>
