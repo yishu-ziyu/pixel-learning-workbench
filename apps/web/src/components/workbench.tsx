@@ -197,7 +197,7 @@ export function LearningWorkbench() {
     {
       label: "开始学习",
       body: currentActivity ? currentActivity.title : reviewPlans.length ? "查看复习计划" : "等待学习节点",
-      state: currentActivity || reviewPlans.length ? "active" : "pending",
+      state: activeRun ? (currentActivity || reviewPlans.length ? "active" : "done") : "pending",
     },
   ];
   const primaryCommand: {

@@ -61,4 +61,8 @@
 - `uv run --project apps/api pytest` 通过：6 passed，保留 FastAPI `on_event` 既有 deprecation warning。
 - `curl -I http://127.0.0.1:3011` 返回 `200 OK`。
 - 首页 HTML 已包含 `跟着练习复习`，源码包含 `当前主任务`、`输入状态`、`学习引导`。
-- 浏览器 MCP 仍被已有 Playwright 会话锁住，未能完成截图级视觉 QA。
+- 已解除卡住的 Playwright MCP 临时 Chrome 进程，并用浏览器验证：
+  - 桌面端打开示例课后，主任务栏、四步状态、检索结果、学习路径均出现。
+  - 主任务栏点击 `提交本步` 后，学习进度从 `1 / 13` 推进到 `2 / 13`。
+  - 移动端 390px 宽度下，四步状态纵向排列且第 4 步不会因历史复习计划误标为当前 active。
+  - 截图产物：`pixel-workbench-desktop-2026-05-05.png`、`pixel-workbench-mobile-fixed-2026-05-05.png`。
