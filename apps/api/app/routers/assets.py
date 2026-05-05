@@ -9,6 +9,7 @@ from app.db import get_db
 from app.models import LearningAsset, User
 from app.schemas import AnalyzeResponse, AssetCreateResponse
 from app.services.analysis import build_learning_representation, recommend_intent
+from app.services.analytics import record_product_event
 from app.services.auth import require_current_user
 from app.services.parser import parse_file, parse_plain_text
 from app.services.storage import persist_upload
@@ -86,6 +87,17 @@ def analyze_asset(
         "learning_representation": learning_representation,
     }
     db.add(asset)
+    record_product_event(
+        db,
+        current_user,
+        "material_parsed",
+        {
+            "asset_id": asset.id,
+            "doc_type": parsed.doc_type_guess,
+            "keyword_count": len(learning_representation.get("keywords", [])),
+            "question_count": len(learning_representation.get("question_targets", [])),
+        },
+    )
     db.commit()
 
     return AnalyzeResponse(

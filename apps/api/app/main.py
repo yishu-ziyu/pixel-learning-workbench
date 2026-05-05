@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.db import Base, engine
-from app.routers import assets, auth, course_runs, reviews
+from app.routers import analytics, assets, auth, course_runs, reviews
 from app.services.storage import ensure_storage_dirs
 
 app = FastAPI(title=settings.app_name)
@@ -32,6 +32,7 @@ def healthz() -> dict[str, str]:
 
 
 app.include_router(auth.router, prefix=settings.api_prefix)
+app.include_router(analytics.router, prefix=settings.api_prefix)
 app.include_router(assets.router, prefix=settings.api_prefix)
 app.include_router(course_runs.router, prefix=settings.api_prefix)
 app.include_router(reviews.router, prefix=settings.api_prefix)

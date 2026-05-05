@@ -9,6 +9,13 @@ from pydantic import BaseModel, EmailStr, Field
 DocType = Literal["paper", "argument_text", "notes_or_textbook"]
 LearningIntent = Literal["deep_read", "logic_breakdown", "course_learning"]
 ActivityType = Literal["scene", "explain", "probe", "challenge", "reflect"]
+ProductEventName = Literal[
+    "first_run_sample_started",
+    "material_parsed",
+    "path_generated",
+    "first_activity_completed",
+    "d1_review_completed",
+]
 
 
 class MessageResponse(BaseModel):
@@ -129,3 +136,27 @@ class ReviewPlanItem(BaseModel):
     status: str
     guide_message: str
 
+
+class ProductEventRequest(BaseModel):
+    event_name: ProductEventName
+    source: str = "web"
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProductEventResponse(BaseModel):
+    id: str
+    event_name: ProductEventName
+    created_at: datetime
+
+
+class ProductFunnelStep(BaseModel):
+    event_name: ProductEventName
+    label: str
+    count: int
+    reached: bool
+
+
+class ProductFunnelResponse(BaseModel):
+    steps: list[ProductFunnelStep]
+    completed_steps: int
+    total_steps: int

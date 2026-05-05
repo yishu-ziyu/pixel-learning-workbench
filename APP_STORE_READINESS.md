@@ -21,7 +21,7 @@ This document does not claim a top-10 ranking. It defines the concrete gates tha
 | Native iOS packaging | No Xcode/iOS wrapper, bundle id, TestFlight build, or App Store Connect app record | Missing |
 | App privacy and review package | No privacy nutrition label source, review notes, support URL, or App Review checklist | Missing |
 | Store creative assets | No final icon variants, 6.7-inch screenshots, iPad screenshots, or app preview videos | Missing |
-| Ranking/retention evidence | No analytics funnel, cohort retention, install conversion, or review-volume data | Missing |
+| Ranking/retention evidence | Basic first-run funnel exists: sample start, material parsed, path generated, first activity completed, D+1 review completed | Partial |
 | Real learning quality | Default provider is still heuristic, not a real model-backed learning engine | Missing |
 
 ## Apple-Specific Gates
@@ -43,7 +43,21 @@ Sources:
 ## Next Build Gates
 
 1. Create native distribution path: Expo/React Native wrapper or iOS shell, bundle id, TestFlight build.
-2. Add measurement: first-run sample start, material parsed, path generated, first activity completed, D+1 review completed.
+2. Upgrade measurement from local funnel to production analytics: install source, first session, D+1/D+7 retention, conversion, and cohort comparison.
 3. Add quality gate: real model provider with deterministic fallback and before/after lesson-quality eval set.
 4. Create store assets: icon, product subtitle, keyword set, screenshot script, app preview script, and three product-page variants.
 5. Add privacy/review package: privacy data map, support URL, review account, demo content, and App Review notes.
+
+## Measurement Implemented
+
+The current build records a local product funnel through `/api/analytics/events` and `/api/analytics/funnel`.
+
+| Funnel step | Event source | Evidence |
+| --- | --- | --- |
+| Open sample course | Web action | `first_run_sample_started` from `handleOpenSampleCourse` |
+| Material parsed | API action | `material_parsed` after `/assets/{asset_id}/analyze` succeeds |
+| Learning path generated | API action | `path_generated` after `/course-runs` succeeds |
+| First activity completed | API action | `first_activity_completed` when the first course activity advances |
+| D+1 review completed | API action | `d1_review_completed` when the first review plan is completed |
+
+This is enough to test whether the local product loop works. It is not enough for App Store ranking claims until connected to production acquisition, retention, cohort, and conversion data.

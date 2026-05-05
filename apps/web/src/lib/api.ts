@@ -7,6 +7,9 @@ import type {
   CourseRunSummary,
   LearningIntent,
   MagicLinkResponse,
+  ProductEventName,
+  ProductEventResponse,
+  ProductFunnelResponse,
   ReviewPlanItem,
   SessionResponse,
 } from "@/types/api";
@@ -119,4 +122,24 @@ export function listReviewPlans(sessionToken: string): Promise<ReviewPlanItem[]>
 
 export function completeReviewPlan(reviewId: string, sessionToken: string): Promise<{ message: string }> {
   return request<{ message: string }>(`/review-plans/${reviewId}/complete`, { method: "POST" }, sessionToken);
+}
+
+export function recordProductEvent(
+  eventName: ProductEventName,
+  payload: Record<string, unknown>,
+  sessionToken: string,
+): Promise<ProductEventResponse> {
+  return request<ProductEventResponse>(
+    "/analytics/events",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event_name: eventName, payload, source: "web" }),
+    },
+    sessionToken,
+  );
+}
+
+export function getProductFunnel(sessionToken: string): Promise<ProductFunnelResponse> {
+  return request<ProductFunnelResponse>("/analytics/funnel", undefined, sessionToken);
 }

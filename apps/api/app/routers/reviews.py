@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models import CourseRun, ReviewPlan, User
 from app.schemas import MessageResponse, ReviewPlanItem
+from app.services.analytics import record_product_event
 from app.services.auth import require_current_user
 
 router = APIRouter(prefix="/review-plans", tags=["reviews"])
@@ -50,5 +51,16 @@ def complete_review_plan(
     plan.status = "completed"
     plan.completed_at = datetime.now(UTC)
     db.add(plan)
+    if plan.stage_label.startswith("D+1"):
+        record_product_event(
+            db,
+            current_user,
+            "d1_review_completed",
+            {
+                "course_run_id": plan.course_run_id,
+                "review_plan_id": plan.id,
+                "stage_label": plan.stage_label,
+            },
+        )
     db.commit()
     return MessageResponse(message="复习计划已完成。")

@@ -91,6 +91,17 @@ class AssessmentEvent(Base, TimestampMixin):
     payload: Mapped[dict[str, Any]] = mapped_column(JSON)
 
 
+class ProductEvent(Base, TimestampMixin):
+    __tablename__ = "product_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    event_name: Mapped[str] = mapped_column(String(80), index=True)
+    source: Mapped[str] = mapped_column(String(40), default="api")
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+    user: Mapped[User] = relationship()
+
+
 class ReviewPlan(Base, TimestampMixin):
     __tablename__ = "review_plans"
 

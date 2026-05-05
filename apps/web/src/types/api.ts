@@ -158,3 +158,22 @@ export interface ReviewPlanItem {
   status: string;
   guide_message: string;
 }
+
+export type ProductEventName = "first_run_sample_started" | "material_parsed" | "path_generated" | "first_activity_completed" | "d1_review_completed";
+
+export interface ProductEventResponse {
+  id: string;
+  event_name: ProductEventName;
+  created_at: string;
+}
+
+export interface ProductFunnelResponse {
+  steps: Array<{
+    event_name: ProductEventName;
+    label: string;
+    count: number;
+    reached: boolean;
+  }>;
+  completed_steps: number;
+  total_steps: number;
+}

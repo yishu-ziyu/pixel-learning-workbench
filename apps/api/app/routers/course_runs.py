@@ -15,6 +15,7 @@ from app.schemas import (
     CourseRunSummary,
     ParsedDocument,
 )
+from app.services.analytics import record_product_event
 from app.services.auth import require_current_user
 from app.services.blueprint import build_course_blueprint
 from app.services.mastery import (
@@ -78,6 +79,18 @@ def create_course_run(
     db.add(course_run)
     db.commit()
     db.refresh(course_run)
+    record_product_event(
+        db,
+        current_user,
+        "path_generated",
+        {
+            "asset_id": payload.asset_id,
+            "course_run_id": course_run.id,
+            "intent": payload.intent,
+            "activity_count": payload.blueprint["cover"]["activity_count"],
+            "chapter_count": payload.blueprint["cover"]["chapter_count"],
+        },
+    )
 
     for schedule in build_review_schedule(course_run.id):
         db.add(
@@ -179,6 +192,19 @@ def record_event(
     )
     db.add(event)
     db.add(run)
+    if current_index == 0 and next_index > 0:
+        record_product_event(
+            db,
+            current_user,
+            "first_activity_completed",
+            {
+                "course_run_id": run.id,
+                "activity_id": payload.activity_id,
+                "activity_type": payload.activity_type,
+                "score": result.get("score"),
+                "is_correct": result.get("is_correct"),
+            },
+        )
     db.commit()
     db.refresh(run)
 

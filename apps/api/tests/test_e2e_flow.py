@@ -46,6 +46,13 @@ def test_text_to_review_plan_flow(tmp_path) -> None:
         assert session_response.status_code == 200
         headers = {"Authorization": f"Bearer {session_response.json()['session_token']}"}
 
+        first_run_response = client.post(
+            "/api/analytics/events",
+            json={"event_name": "first_run_sample_started", "source": "test", "payload": {"entry": "sample_course"}},
+            headers=headers,
+        )
+        assert first_run_response.status_code == 200
+
         asset_response = client.post("/api/assets", data={"text": text}, headers=headers)
         assert asset_response.status_code == 200
         asset_id = asset_response.json()["asset_id"]
@@ -88,5 +95,21 @@ def test_text_to_review_plan_flow(tmp_path) -> None:
         assert review_response.status_code == 200
         reviews = review_response.json()
         assert [item["stage_label"] for item in reviews] == ["D+1 回访", "D+3 强化", "D+7 迁移"]
+
+        complete_review_response = client.post(f"/api/review-plans/{reviews[0]['id']}/complete", headers=headers)
+        assert complete_review_response.status_code == 200
+
+        funnel_response = client.get("/api/analytics/funnel", headers=headers)
+        assert funnel_response.status_code == 200
+        funnel = funnel_response.json()
+        assert funnel["completed_steps"] == 5
+        assert [step["event_name"] for step in funnel["steps"]] == [
+            "first_run_sample_started",
+            "material_parsed",
+            "path_generated",
+            "first_activity_completed",
+            "d1_review_completed",
+        ]
+        assert all(step["reached"] for step in funnel["steps"])
     finally:
         app.dependency_overrides.clear()

@@ -12,6 +12,7 @@ import {
   listCourseRuns,
   listReviewPlans,
   requestMagicLink,
+  recordProductEvent,
   submitEvent,
   verifyMagicLink,
 } from "@/lib/api";
@@ -22,6 +23,7 @@ import type {
   CourseRun,
   CourseRunSummary,
   LearningIntent,
+  ProductEventName,
   ReviewPlanItem,
   SessionResponse,
 } from "@/types/api";
@@ -272,6 +274,15 @@ export function LearningWorkbench() {
     setReviewPlans(nextReviews);
   }
 
+  async function trackProductEvent(eventName: ProductEventName, payload: Record<string, unknown> = {}, token = session?.session_token) {
+    if (!token) return;
+    try {
+      await recordProductEvent(eventName, payload, token);
+    } catch {
+      // Analytics must never block the learning flow.
+    }
+  }
+
   async function completeLogin(token: string) {
     const verified = await verifyMagicLink(token);
     setSession(verified);
@@ -433,6 +444,7 @@ export function LearningWorkbench() {
       setActiveStage("input");
       localStorage.setItem(sessionStorageKey, JSON.stringify(verified));
       setMagicPreview(null);
+      await trackProductEvent("first_run_sample_started", { entry: "sample_course" }, verified.session_token);
       await createCourseFromSource(verified.session_token, undefined, { text: sampleText, file: null });
       setInfoMessage("示例课已准备好。你可以先走完一轮，再换成自己的材料。");
     } catch (cause) {
