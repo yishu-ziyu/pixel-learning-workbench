@@ -59,6 +59,14 @@
 - [x] 运行 lint/build/API 验证。
 - [x] 提交并推送本轮改动。
 
+## 2026-05-05 商店素材基础包
+
+- [x] 确认缺口：仍缺 final icon variants、6.7-inch screenshots、iPad screenshots、app preview videos。
+- [x] 新增 `STORE_ASSETS.md`：产品页文案、关键词假设、截图 storyboard、三组产品页优化变体、预览视频脚本。
+- [x] 新增 `/store-preview` 静态截图构图页。
+- [x] 运行 lint/build 和浏览器验证。
+- [x] 提交并推送本轮改动。
+
 ## 验证标准
 
 - 页面首屏能直接说明产品是材料学习转换器，而不是抽象课程工作台。

@@ -457,3 +457,10 @@ pnpm --dir apps/web build
 - 自动埋点：材料解析完成、学习路径生成、首个学习节点完成、D+1 回访完成都由 API 端记录，减少前端漏报。
 - 前端埋点：打开示例课时记录 `first_run_sample_started`。
 - 后续限制：这只是本地产品漏斗，不等于生产 analytics；下一阶段仍需要 install source、D+1/D+7 留存、转化率、cohort 和商店素材实验数据。
+
+## 2026-05-05 商店素材基础包
+
+- 目标审计继续推进到 `Store creative assets`：此前只有 readiness 缺口描述，没有可复用的产品页文案、截图脚本或产品页优化假设。
+- 新增 `STORE_ASSETS.md`，固定产品名、subtitle、promotional text、关键词假设、6 张 iPhone 截图 storyboard、3 个 Product Page Optimization 变体和 30 秒 app preview 脚本。
+- 新增 `/store-preview` 静态素材预览页，用同一套视觉系统展示 6 个截图构图方向，后续可作为真实 native app state 截图的构图参考。
+- 后续限制：这仍是 draft creative kit，不是最终 App Store Connect 资产；最终还需要 native build、真实设备截图、iPad 截图、导出视频和本地化元数据。

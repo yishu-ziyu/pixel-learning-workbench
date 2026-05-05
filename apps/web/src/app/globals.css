@@ -864,6 +864,137 @@ textarea {
   font-size: 14px;
 }
 
+.store-preview-shell {
+  width: min(1280px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 30px 0 48px;
+  position: relative;
+  z-index: 1;
+}
+
+.store-preview-hero {
+  min-height: 280px;
+  display: grid;
+  align-content: center;
+  gap: 14px;
+}
+
+.store-preview-hero p {
+  max-width: 680px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.store-shot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.store-shot {
+  min-height: 560px;
+}
+
+.phone-frame {
+  height: 100%;
+  border-radius: 34px;
+  padding: 12px;
+  background: #17211d;
+  box-shadow: var(--shadow);
+}
+
+.phone-status {
+  width: 76px;
+  height: 20px;
+  margin: 0 auto 10px;
+  border-radius: 999px;
+  background: #0a100d;
+}
+
+.phone-screen {
+  min-height: 500px;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 30px 22px;
+  border-radius: 26px;
+  background:
+    linear-gradient(90deg, rgba(15, 143, 120, 0.05) 1px, transparent 1px),
+    #fbfcfa;
+  background-size: 24px 100%;
+}
+
+.phone-screen h2 {
+  font-size: 32px;
+  line-height: 1.04;
+}
+
+.phone-screen p:not(.eyebrow) {
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.phone-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.phone-panel span {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--panel-border);
+  background: var(--panel-soft);
+  font-weight: 700;
+}
+
+.store-variant-band {
+  margin-top: 22px;
+  padding: 22px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.variant-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.variant-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--panel-border);
+  background: var(--panel-soft);
+}
+
+.variant-card span {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--mint);
+  color: #ffffff;
+  font-family: var(--pixel-font);
+  font-weight: 700;
+}
+
+.variant-card p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 @media (max-width: 1180px) {
   .hero-strip,
   .workspace-intro,
@@ -873,8 +1004,14 @@ textarea {
   .workflow-status,
   .command-bar,
   .review-columns,
-  .source-map {
+  .source-map,
+  .store-shot-grid,
+  .store-variant-band {
     grid-template-columns: 1fr;
+  }
+
+  .variant-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .workspace-grid > .panel:nth-child(1),
@@ -923,6 +1060,27 @@ textarea {
   .format-strip {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .store-preview-shell {
+    width: min(calc(100% - 16px), 1280px);
+    padding-top: 18px;
+  }
+
+  .store-preview-hero {
+    min-height: 220px;
+  }
+
+  .store-shot {
+    min-height: 520px;
+  }
+
+  .phone-screen h2 {
+    font-size: 28px;
+  }
+
+  .variant-grid {
+    grid-template-columns: 1fr;
   }
 
   .command-button {

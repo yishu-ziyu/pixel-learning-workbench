@@ -20,7 +20,7 @@ This document does not claim a top-10 ranking. It defines the concrete gates tha
 | Prepare App Store product-page strategy | This audit captures Apple product-page, optimization, and custom-page gates | Drafted |
 | Native iOS packaging | No Xcode/iOS wrapper, bundle id, TestFlight build, or App Store Connect app record | Missing |
 | App privacy and review package | No privacy nutrition label source, review notes, support URL, or App Review checklist | Missing |
-| Store creative assets | No final icon variants, 6.7-inch screenshots, iPad screenshots, or app preview videos | Missing |
+| Store creative assets | `STORE_ASSETS.md` and `/store-preview` provide product-page copy, screenshot storyboard, preview script, and page-optimization variants | Partial |
 | Ranking/retention evidence | Basic first-run funnel exists: sample start, material parsed, path generated, first activity completed, D+1 review completed | Partial |
 | Real learning quality | Default provider is still heuristic, not a real model-backed learning engine | Missing |
 
@@ -45,7 +45,7 @@ Sources:
 1. Create native distribution path: Expo/React Native wrapper or iOS shell, bundle id, TestFlight build.
 2. Upgrade measurement from local funnel to production analytics: install source, first session, D+1/D+7 retention, conversion, and cohort comparison.
 3. Add quality gate: real model provider with deterministic fallback and before/after lesson-quality eval set.
-4. Create store assets: icon, product subtitle, keyword set, screenshot script, app preview script, and three product-page variants.
+4. Replace draft store assets with final native-app screenshots, icon variants, iPad captures, and exported app preview video files.
 5. Add privacy/review package: privacy data map, support URL, review account, demo content, and App Review notes.
 
 ## Measurement Implemented
@@ -61,3 +61,12 @@ The current build records a local product funnel through `/api/analytics/events`
 | D+1 review completed | API action | `d1_review_completed` when the first review plan is completed |
 
 This is enough to test whether the local product loop works. It is not enough for App Store ranking claims until connected to production acquisition, retention, cohort, and conversion data.
+
+## Store Creative Kit Implemented
+
+The current build includes a draft App Store creative kit:
+
+- `STORE_ASSETS.md` contains app name, subtitle, promotional copy, keyword hypotheses, six-screen screenshot storyboard, three product-page optimization variants, and a 30-second app preview script.
+- `/store-preview` renders a static screenshot board that can guide 6.7-inch iPhone screenshot composition.
+
+This is still not final App Store material. Final submission needs screenshots from actual native app states, exported preview videos, all required icon sizes, and App Store Connect localization metadata.
