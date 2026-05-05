@@ -942,7 +942,7 @@ export function LearningWorkbench() {
               <div className="panel-head">
                 <div>
                   <p className="eyebrow">3 LEARNING PATH</p>
-                  <h3>跟着卡片一步一步练习</h3>
+                  <h3>跟着下面的学习卡片操作</h3>
                 </div>
               </div>
               {activeRun && currentActivity ? (
@@ -950,20 +950,20 @@ export function LearningWorkbench() {
                   <div className="path-help-card">
                     <div>
                       <span className="help-kicker">第三步怎么用</span>
-                      <strong>这不是再看一份摘要，而是按卡片完成一个学习动作。</strong>
+                      <strong>往下看，写着“当前学习卡片”的白色区域，就是这一轮要读和操作的地方。</strong>
                     </div>
                     <ol className="path-help-steps">
                       <li>
                         <span>1</span>
-                        读当前卡片
+                        看下方“当前学习卡片”区域
                       </li>
                       <li>
                         <span>2</span>
-                        按要求选择或作答
+                        在卡片底部选择、填写或确认把握
                       </li>
                       <li>
                         <span>3</span>
-                        提交后自动进入下一节点
+                        点卡片底部绿色按钮进入下一节点
                       </li>
                     </ol>
                   </div>
@@ -976,20 +976,15 @@ export function LearningWorkbench() {
                     </span>
                     <span className="status-pill">{activeRun.course_status === "completed" ? "已完成" : "学习中"}</span>
                   </div>
-                  <div className="coach-console">
-                    <div className="coach-avatar">
-                      <span>PX</span>
-                    </div>
-                    <div>
-                      <p className="coach-role">学习引导</p>
-                      <p>{activeRun.latest_guide_message}</p>
-                    </div>
-                  </div>
                   <div className="activity-card">
+                    <div className="activity-card-label">
+                      <span>当前学习卡片</span>
+                      <strong>先看这里，再操作底部按钮</strong>
+                    </div>
                     <span className="activity-type">{formatActivityType(currentActivity.type)}</span>
                     <h4>{currentActivity.title}</h4>
                     <div className="current-action-card">
-                      <span>当前你要做的是</span>
+                      <span>这张卡片要你做的是</span>
                       <strong>{activityInstruction(currentActivity.type)}</strong>
                     </div>
                     <p>{currentActivity.body}</p>
@@ -1057,6 +1052,15 @@ export function LearningWorkbench() {
                     >
                       {activitySubmitLabel(currentActivity.type)}
                     </button>
+                  </div>
+                  <div className="coach-console">
+                    <div className="coach-avatar">
+                      <span>PX</span>
+                    </div>
+                    <div>
+                      <p className="coach-role">学习引导</p>
+                      <p>{activeRun.latest_guide_message}</p>
+                    </div>
                   </div>
                 </>
               ) : activeRun && activeRun.course_status === "completed" ? (

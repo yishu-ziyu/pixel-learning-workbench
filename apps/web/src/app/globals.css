@@ -749,6 +749,31 @@ textarea {
 .activity-card {
   display: grid;
   gap: 14px;
+  padding: 18px;
+  border: 2px solid rgba(15, 143, 120, 0.24);
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(26, 45, 39, 0.06);
+}
+
+.activity-card-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #eaf7f2;
+}
+
+.activity-card-label span {
+  color: var(--mint);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.activity-card-label strong {
+  font-size: 14px;
 }
 
 .current-action-card {
@@ -1119,6 +1144,11 @@ textarea {
 
   .toolbar-meta {
     align-items: stretch;
+    flex-direction: column;
+  }
+
+  .activity-card-label {
+    align-items: flex-start;
     flex-direction: column;
   }
 
