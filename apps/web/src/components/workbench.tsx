@@ -156,6 +156,30 @@ export function LearningWorkbench() {
       : currentActivity
         ? `${formatActivityType(currentActivity.type)}：${currentActivity.title}`
         : "查看复习";
+  const workflowStatus = [
+    {
+      label: "输入材料",
+      body: selectedFile ? selectedFile.name : inputText.trim() ? `${inputText.trim().length} 字文本` : "等待材料",
+      state: session ? (analyzeResult ? "done" : "active") : "pending",
+    },
+    {
+      label: "检索结构",
+      body: analyzeResult
+        ? `${analyzeResult.learning_representation.argument_graph.length} 个结构节点`
+        : "解析后显示论点、证据和概念",
+      state: analyzeResult ? (activeRun ? "done" : "active") : "pending",
+    },
+    {
+      label: "生成路径",
+      body: blueprint ? `${blueprint.cover.chapter_count} 章 / ${blueprint.cover.activity_count} 个节点` : "等待转换",
+      state: activeRun ? "done" : analyzeResult ? "active" : "pending",
+    },
+    {
+      label: "开始学习",
+      body: currentActivity ? currentActivity.title : reviewPlans.length ? "查看复习计划" : "等待学习节点",
+      state: currentActivity || reviewPlans.length ? "active" : "pending",
+    },
+  ];
 
   async function refreshDashboard(token = session?.session_token) {
     if (!token) return;
@@ -432,44 +456,51 @@ export function LearningWorkbench() {
 
   return (
     <main className="app-shell">
-      <section className="hero-strip">
-        <div>
-          <p className="eyebrow">MATERIAL LEARNING CONVERTER</p>
-          <h1>把 PDF、报告和长文，转换成可学习的练习路径。</h1>
-          <p className="hero-copy">
-            这个产品的主线很简单：你输入材料，系统先检索材料内部的论点、证据和概念，再把它们变成追问、测验、复盘和复习计划。
-          </p>
-          <div className="promise-grid" aria-label="产品能做什么">
-            {productPromise.map((item, index) => (
-              <article key={item.title} className="promise-card">
-                <span>{index + 1}</span>
-                <strong>{item.title}</strong>
-                <p>{item.body}</p>
-              </article>
-            ))}
+      {!session ? (
+        <section className="hero-strip">
+          <div>
+            <p className="eyebrow">MATERIAL LEARNING CONVERTER</p>
+            <h1>把 PDF、报告和长文，转换成可学习的练习路径。</h1>
+            <p className="hero-copy">
+              这个产品的主线很简单：你输入材料，系统先检索材料内部的论点、证据和概念，再把它们变成追问、测验、复盘和复习计划。
+            </p>
+            <div className="promise-grid" aria-label="产品能做什么">
+              {productPromise.map((item, index) => (
+                <article key={item.title} className="promise-card">
+                  <span>{index + 1}</span>
+                  <strong>{item.title}</strong>
+                  <p>{item.body}</p>
+                </article>
+              ))}
+            </div>
           </div>
-          <div className="journey-rail" aria-label="试用路径">
-            <span className={session && !analyzeResult ? "active" : ""}>1 输入材料</span>
-            <span className={analyzeResult && !activeRun ? "active" : ""}>2 检索材料</span>
-            <span className={activeRun && currentActivity ? "active" : ""}>3 转成路径</span>
-            <span className={reviewPlans.length ? "active" : ""}>4 学习复习</span>
+          <div className="hero-stats">
+            <div className="stat-card">
+              <span>最快开始</span>
+              <strong>打开示例课</strong>
+            </div>
+            <div className="stat-card">
+              <span>也可以</span>
+              <strong>粘贴自己的材料</strong>
+            </div>
+            <div className="stat-card">
+              <span>当前下一步</span>
+              <strong>{nextStep}</strong>
+            </div>
           </div>
-        </div>
-        <div className="hero-stats">
-          <div className="stat-card">
-            <span>最快开始</span>
-            <strong>打开示例课</strong>
+        </section>
+      ) : (
+        <section className="workspace-intro">
+          <div>
+            <p className="eyebrow">MATERIAL LEARNING CONVERTER</p>
+            <h1>今天只做一件事：把材料变成可练习的学习路径。</h1>
           </div>
-          <div className="stat-card">
-            <span>也可以</span>
-            <strong>粘贴自己的材料</strong>
-          </div>
-          <div className="stat-card">
+          <div className="next-step-card">
             <span>当前下一步</span>
             <strong>{nextStep}</strong>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {!session ? (
         <section className="login-shell panel">
@@ -532,6 +563,16 @@ export function LearningWorkbench() {
 
           {error ? <div className="status-banner error-banner">{error}</div> : null}
           {infoMessage ? <div className="status-banner info-banner">{infoMessage}</div> : null}
+
+          <section className="workflow-status" aria-label="当前工作流状态">
+            {workflowStatus.map((step, index) => (
+              <article key={step.label} className={`flow-step ${step.state}`}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <strong>{step.label}</strong>
+                <p>{step.body}</p>
+              </article>
+            ))}
+          </section>
 
           <div className="workspace-grid">
             <section className="panel input-panel">

@@ -1,11 +1,22 @@
 # 当前任务清单
 
+## 2026-05-05 UI 收敛
+
 - [x] 确认 `~/.codex/AGENTS.md` 的 `quality_execution_guidelines` 已加载。
 - [x] 明确当前产品成功标准：用户能看懂并使用 `输入材料 -> 检索材料 -> 转成学习路径 -> 开始学习`。
 - [x] 重构主工作台，让材料解析和材料检索结果成为显式步骤。
 - [x] 更新 README / DEVLOG，纠正产品定位表达。
 - [x] 运行前端 lint、build 和本地页面验证。
 - [x] 提交本地 commit，并记录无法 push 的原因。
+
+## 2026-05-05 UI 清晰度修复
+
+- [x] 移除登录后大 hero 对工作台的干扰。
+- [x] 增加四步工作流状态条，明确当前步骤和下一步。
+- [x] 将主工作区改为材料、检索、学习三列，复习历史下沉到底部。
+- [x] 将视觉系统从重暗色卡片改成更轻的工作台风格。
+- [x] 运行前端 lint、build 和页面验证。
+- [x] 提交本地 commit，并尝试 push。
 
 ## 验证标准
 
@@ -23,3 +34,11 @@
 - API 烟测通过：文本材料 -> analyze -> course-blueprint -> course-run，返回 `paper / direct_text / 4 graph nodes / 4 questions / 8 keywords / 4 chapters / in_progress`。
 - 浏览器 MCP 当前被已有 Playwright 会话锁住，未能做交互截图验证。
 - 本地已提交；当前仓库没有配置 remote，因此无法执行 `git push`。
+
+### UI 清晰度修复验证
+
+- `pnpm --dir apps/web lint` 通过。
+- `pnpm --dir apps/web build` 通过。
+- `curl -I http://127.0.0.1:3011` 返回 `200 OK`。
+- 页面正文包含 `材料学习转换器`、`输入一份材料`、`检索材料内部结构`、`转成学习形态`。
+- 浏览器 MCP 仍被已有 Playwright 会话锁住；仓库本身没有安装 `playwright` 包，因此本轮没有完成截图级交互验证。
