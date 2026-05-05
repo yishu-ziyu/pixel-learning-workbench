@@ -83,7 +83,10 @@ a {
 .last-result p,
 .history-card span,
 .review-card p,
-.mastery-row p {
+.mastery-row p,
+.retrieval-summary p,
+.source-card p,
+.format-strip span {
   color: var(--muted);
   line-height: 1.65;
 }
@@ -269,7 +272,11 @@ textarea {
 .mastery-box,
 .activity-card,
 .trial-note,
-.next-action-card {
+.next-action-card,
+.retrieval-summary,
+.source-card,
+.risk-box,
+.format-strip {
   border-radius: 20px;
   background: rgba(6, 10, 17, 0.62);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -564,6 +571,82 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.source-block {
+  display: grid;
+  gap: 12px;
+}
+
+.source-map {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.source-card {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-height: 154px;
+}
+
+.source-card > span {
+  width: fit-content;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: rgba(246, 197, 97, 0.12);
+  color: var(--amber);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.question-targets {
+  display: grid;
+  gap: 10px;
+}
+
+.question-target {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(126, 220, 255, 0.06);
+  border: 1px solid rgba(126, 220, 255, 0.12);
+}
+
+.question-target span {
+  color: var(--cyan);
+  font-size: 13px;
+}
+
+.risk-box {
+  display: grid;
+  gap: 10px;
+  border-color: rgba(246, 197, 97, 0.18);
+}
+
+.risk-box ul {
+  display: grid;
+  gap: 8px;
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.format-strip {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  border-color: rgba(126, 244, 216, 0.18);
+}
+
+.format-strip > div {
+  display: grid;
+  gap: 6px;
+}
+
 .history-list {
   margin-top: 10px;
 }
@@ -599,7 +682,8 @@ textarea {
   .login-shell,
   .promise-grid,
   .workspace-grid,
-  .review-columns {
+  .review-columns,
+  .source-map {
     grid-template-columns: 1fr;
   }
 
@@ -627,7 +711,8 @@ textarea {
   }
 
   .confidence-row,
-  .mastery-row {
+  .mastery-row,
+  .question-target {
     grid-template-columns: 1fr;
   }
 
@@ -638,5 +723,10 @@ textarea {
 
   .progress-bar {
     flex-basis: 100%;
+  }
+
+  .format-strip {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

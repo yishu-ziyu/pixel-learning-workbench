@@ -44,16 +44,16 @@ The effect depends on turning claims and evidence into actions instead of summar
 
 const productPromise = [
   {
-    title: "放入一篇难读材料",
-    body: "论文、报告、课程笔记都可以。你可以先看示例课，再换成自己的材料。",
+    title: "输入一份材料",
+    body: "粘贴长文，或上传 PDF / DOCX / TXT / MD。系统先把它当作学习对象，而不是让你先填复杂表单。",
   },
   {
-    title: "得到一条练习路径",
-    body: "系统会拆出论点、证据、概念和可能卡住的地方，整理成可跟着做的步骤。",
+    title: "检索材料内部结构",
+    body: "系统会抽出论点、证据、概念、问题目标和容易误解的地方，让你先看见它读到了什么。",
   },
   {
-    title: "按自己的节奏检查理解",
-    body: "你可以回答追问、做选择题、写复盘，也可以随时退出，稍后继续。",
+    title: "转成学习形态",
+    body: "再把检索结果转换成练习路径、追问、选择题、复盘和后续复习计划。",
   },
 ];
 
@@ -103,6 +103,24 @@ function formatActivityType(type: string): string {
   return labels[type] ?? type;
 }
 
+function recordText(entry: Record<string, unknown>, key: string, fallback = ""): string {
+  const value = entry[key];
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  if (Array.isArray(value)) return value.filter((item) => typeof item === "string" || typeof item === "number").join("、");
+  return fallback;
+}
+
+function formatGraphKind(kind: string): string {
+  const labels: Record<string, string> = {
+    claim: "论点",
+    evidence: "证据",
+    premise: "前提",
+    risk: "风险",
+  };
+  return labels[kind] ?? kind;
+}
+
 export function LearningWorkbench() {
   const [session, setSession] = useState<SessionResponse | null>(null);
   const [email, setEmail] = useState("learner@example.com");
@@ -112,6 +130,7 @@ export function LearningWorkbench() {
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [preparedAssetId, setPreparedAssetId] = useState<string | null>(null);
   const [analyzeResult, setAnalyzeResult] = useState<AnalyzeResponse | null>(null);
   const [blueprint, setBlueprint] = useState<CourseBlueprint | null>(null);
   const [activeRun, setActiveRun] = useState<CourseRun | null>(null);
@@ -127,10 +146,13 @@ export function LearningWorkbench() {
   const currentRubricFacets = currentActivity?.rubric?.required_facets ?? [];
   const currentRubricKeywords = currentActivity?.rubric?.expected_keywords ?? currentActivity?.expected_keywords ?? [];
   const incompleteRuns = runs.filter((run) => run.course_status !== "completed");
+  const canUseMaterial = Boolean(selectedFile) || inputText.trim().length >= 80;
   const nextStep = !session
     ? "打开示例课"
-    : !activeRun
-      ? "选择材料"
+    : !analyzeResult
+      ? "输入并解析材料"
+      : !activeRun
+        ? "转成学习路径"
       : currentActivity
         ? `${formatActivityType(currentActivity.type)}：${currentActivity.title}`
         : "查看复习";
@@ -224,19 +246,47 @@ export function LearningWorkbench() {
     intentOverride?: LearningIntent,
     source: { text?: string; file?: File | null } = {},
   ) {
+    const prepared = await prepareMaterialFromSource(token, source);
+    await createLearningPathFromPrepared(token, prepared.assetId, prepared.analyzed, intentOverride);
+  }
+
+  async function prepareMaterialFromSource(token: string, source: { text?: string; file?: File | null } = {}) {
     const file = source.file === undefined ? selectedFile : source.file;
     const text = file ? undefined : source.text ?? inputText;
     const asset = await createAsset({ text, file: file ?? undefined }, token);
     const analyzed = await analyzeAsset(asset.asset_id, token);
+    setPreparedAssetId(asset.asset_id);
     setAnalyzeResult(analyzed);
+    setBlueprint(null);
+    setActiveRun(null);
+    setFreeTextAnswer("");
+    setSelectedChoice(null);
+    return { assetId: asset.asset_id, analyzed };
+  }
+
+  async function createLearningPathFromPrepared(
+    token: string,
+    assetId: string,
+    analyzed: AnalyzeResponse,
+    intentOverride?: LearningIntent,
+  ) {
     const intent = intentOverride ?? analyzed.recommended_intent;
-    const blueprintResponse = await createBlueprint(asset.asset_id, intent, token);
+    const blueprintResponse = await createBlueprint(assetId, intent, token);
     setBlueprint(blueprintResponse.blueprint);
-    const run = await createCourseRun(asset.asset_id, intent, blueprintResponse.blueprint, token);
+    const run = await createCourseRun(assetId, intent, blueprintResponse.blueprint, token);
     setActiveRun(run);
     setFreeTextAnswer("");
     setSelectedChoice(null);
     await refreshDashboard(token);
+  }
+
+  function clearPreparedMaterial() {
+    setPreparedAssetId(null);
+    setAnalyzeResult(null);
+    setBlueprint(null);
+    setActiveRun(null);
+    setFreeTextAnswer("");
+    setSelectedChoice(null);
   }
 
   async function handleStartDemo() {
@@ -282,10 +332,30 @@ export function LearningWorkbench() {
     setIsBusy(true);
     setError(null);
     try {
-      await createCourseFromSource(session.session_token, intentOverride);
-      setInfoMessage("练习已生成。你可以从第一步开始，也可以稍后继续。");
+      if (preparedAssetId && analyzeResult) {
+        await createLearningPathFromPrepared(session.session_token, preparedAssetId, analyzeResult, intentOverride);
+      } else {
+        await createCourseFromSource(session.session_token, intentOverride);
+      }
+      setInfoMessage("学习路径已生成。你可以从第一步开始，也可以稍后继续。");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "生成课程失败");
+      setError(cause instanceof Error ? cause.message : "生成学习路径失败");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleAnalyzeMaterial() {
+    if (!session) return;
+    setIsBusy(true);
+    setError(null);
+    try {
+      const prepared = await prepareMaterialFromSource(session.session_token);
+      setInfoMessage(
+        `材料已解析：检索到 ${prepared.analyzed.learning_representation.argument_graph.length} 个结构节点、${prepared.analyzed.learning_representation.question_targets.length} 个可练习问题。`,
+      );
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "解析材料失败");
     } finally {
       setIsBusy(false);
     }
@@ -351,6 +421,7 @@ export function LearningWorkbench() {
   function resetSession() {
     setSession(null);
     setMagicPreview(null);
+    setPreparedAssetId(null);
     setAnalyzeResult(null);
     setBlueprint(null);
     setActiveRun(null);
@@ -363,10 +434,10 @@ export function LearningWorkbench() {
     <main className="app-shell">
       <section className="hero-strip">
         <div>
-          <p className="eyebrow">PIXEL LEARNING WORKBENCH</p>
-          <h1>把难读材料，变成一套可以跟着做的学习练习。</h1>
+          <p className="eyebrow">MATERIAL LEARNING CONVERTER</p>
+          <h1>把 PDF、报告和长文，转换成可学习的练习路径。</h1>
           <p className="hero-copy">
-            它适合论文、报告和课程笔记。你放入材料，系统帮你拆成练习步骤、理解检查和后续复习。
+            这个产品的主线很简单：你输入材料，系统先检索材料内部的论点、证据和概念，再把它们变成追问、测验、复盘和复习计划。
           </p>
           <div className="promise-grid" aria-label="产品能做什么">
             {productPromise.map((item, index) => (
@@ -378,10 +449,10 @@ export function LearningWorkbench() {
             ))}
           </div>
           <div className="journey-rail" aria-label="试用路径">
-            <span className={!session ? "active" : ""}>1 进入</span>
-            <span className={session && !activeRun ? "active" : ""}>2 建课</span>
-            <span className={activeRun && currentActivity ? "active" : ""}>3 验证</span>
-            <span className={reviewPlans.length ? "active" : ""}>4 回访</span>
+            <span className={session && !analyzeResult ? "active" : ""}>1 输入材料</span>
+            <span className={analyzeResult && !activeRun ? "active" : ""}>2 检索材料</span>
+            <span className={activeRun && currentActivity ? "active" : ""}>3 转成路径</span>
+            <span className={reviewPlans.length ? "active" : ""}>4 学习复习</span>
           </div>
         </div>
         <div className="hero-stats">
@@ -444,7 +515,7 @@ export function LearningWorkbench() {
           <header className="toolbar">
             <div>
               <p className="eyebrow">WELCOME BACK</p>
-              <h2>{session.user.display_name} 的像素学习工作台</h2>
+              <h2>{session.user.display_name} 的材料学习转换器</h2>
             </div>
             <div className="toolbar-meta">
               <span>{session.user.email}</span>
@@ -466,29 +537,53 @@ export function LearningWorkbench() {
             <section className="panel input-panel">
               <div className="panel-head">
                 <div>
-                  <p className="eyebrow">UPLOAD / PASTE</p>
-                  <h3>放入你想读懂的材料</h3>
+                  <p className="eyebrow">1 MATERIAL INPUT</p>
+                  <h3>输入你想读懂的材料</h3>
                 </div>
-                <button className="secondary-button" onClick={() => setInputText(sampleText)}>
+                <button
+                  className="secondary-button"
+                  onClick={() => {
+                    setInputText(sampleText);
+                    setSelectedFile(null);
+                    clearPreparedMaterial();
+                  }}
+                >
                   加载示例
                 </button>
               </div>
               <div className="next-action-card">
-                <strong>当前建议</strong>
-                <span>如果你还在熟悉产品，就保留示例文本；如果已经知道要学什么，就直接粘贴自己的材料。</span>
+                <strong>这一步只做一件事</strong>
+                <span>把原始材料放进来。系统下一步会先检索材料内部结构，不会直接把它伪装成一门课。</span>
               </div>
               <textarea
                 value={inputText}
-                onChange={(event) => setInputText(event.target.value)}
+                onChange={(event) => {
+                  setInputText(event.target.value);
+                  clearPreparedMaterial();
+                }}
                 placeholder="粘贴论文、长文或课程笔记..."
                 disabled={Boolean(selectedFile)}
               />
               <label className="file-picker">
                 <span>{selectedFile ? `已选择：${selectedFile.name}` : "或者上传 PDF / DOCX / TXT / MD"}</span>
-                <input type="file" accept=".pdf,.docx,.txt,.md" onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)} />
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.txt,.md"
+                  onChange={(event) => {
+                    setSelectedFile(event.target.files?.[0] ?? null);
+                    clearPreparedMaterial();
+                  }}
+                />
               </label>
               {selectedFile ? (
-                <button className="secondary-button compact-button" onClick={() => setSelectedFile(null)} disabled={isBusy}>
+                <button
+                  className="secondary-button compact-button"
+                  onClick={() => {
+                    setSelectedFile(null);
+                    clearPreparedMaterial();
+                  }}
+                  disabled={isBusy}
+                >
                   清除文件，改用粘贴文本
                 </button>
               ) : null}
@@ -497,20 +592,33 @@ export function LearningWorkbench() {
                 <span>报告：抓结论和边界</span>
                 <span>笔记：变成练习课</span>
               </div>
-              <button className="pixel-button" disabled={isBusy || (!selectedFile && inputText.trim().length < 80)} onClick={() => handleGenerateCourse()}>
-                {isBusy ? "生成中..." : "把这段材料变成练习课"}
+              <button className="pixel-button" disabled={isBusy || !canUseMaterial} onClick={handleAnalyzeMaterial}>
+                {isBusy ? "解析中..." : "解析并检索这份材料"}
               </button>
+              {analyzeResult ? (
+                <button className="secondary-button" disabled={isBusy} onClick={() => handleGenerateCourse()}>
+                  转成学习路径
+                </button>
+              ) : null}
             </section>
 
             <section className="panel studio-panel">
               <div className="panel-head">
                 <div>
-                  <p className="eyebrow">COURSE STUDIO</p>
-                  <h3>系统如何拆这份材料</h3>
+                  <p className="eyebrow">2 MATERIAL RETRIEVAL</p>
+                  <h3>系统从材料里检索到了什么</h3>
                 </div>
               </div>
               {analyzeResult ? (
                 <>
+                  <div className="retrieval-summary">
+                    <strong>检索结果摘要</strong>
+                    <p>
+                      系统已经把材料解析为 {analyzeResult.parsed_document.sections.length} 个段落区块、
+                      {analyzeResult.parsed_document.paragraphs.length} 段正文，并抽取出{" "}
+                      {analyzeResult.learning_representation.keywords.length} 个关键词。
+                    </p>
+                  </div>
                   <div className="meta-grid">
                     <div className="meta-card">
                       <span>材料类型</span>
@@ -525,7 +633,64 @@ export function LearningWorkbench() {
                       <strong>{analyzeResult.parsed_document.parse_strategy}</strong>
                     </div>
                   </div>
+                  {analyzeResult.learning_representation.keywords.length ? (
+                    <div className="source-block">
+                      <h4>关键词</h4>
+                      <div className="chip-row">
+                        {analyzeResult.learning_representation.keywords.map((keyword) => (
+                          <span key={keyword}>{keyword}</span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="source-block">
+                    <h4>材料结构</h4>
+                    <div className="source-map">
+                      {analyzeResult.learning_representation.argument_graph.map((node) => {
+                        const label = recordText(node, "label", "结构节点");
+                        const detail = recordText(node, "detail", "等待从材料中补充细节。");
+                        const kind = formatGraphKind(recordText(node, "kind", "node"));
+                        return (
+                          <article key={recordText(node, "id", label)} className="source-card">
+                            <span>{kind}</span>
+                            <strong>{label}</strong>
+                            <p>{detail}</p>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="source-block">
+                    <h4>可转成的学习问题</h4>
+                    <div className="question-targets">
+                      {analyzeResult.learning_representation.question_targets.map((target) => (
+                        <div key={recordText(target, "id", recordText(target, "prompt"))} className="question-target">
+                          <strong>{recordText(target, "prompt", "待生成学习问题")}</strong>
+                          <span>{recordText(target, "rubric_facets", "理解检查")}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {analyzeResult.learning_representation.misconception_risks.length ? (
+                    <div className="risk-box">
+                      <h4>系统提醒你容易误解的地方</h4>
+                      <ul>
+                        {analyzeResult.learning_representation.misconception_risks.map((risk) => (
+                          <li key={risk}>{risk}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                   {analyzeResult.follow_up_question ? <p className="follow-up">{analyzeResult.follow_up_question}</p> : null}
+                  <div className="format-strip">
+                    <div>
+                      <strong>下一步：选择学习形态</strong>
+                      <span>默认用推荐模式，也可以改成深度解读、逻辑拆解或课程化学习。</span>
+                    </div>
+                    <button className="pixel-button compact-button" onClick={() => handleGenerateCourse()} disabled={isBusy}>
+                      转成学习路径
+                    </button>
+                  </div>
                   <div className="toggle-row">
                     {(["deep_read", "logic_breakdown", "course_learning"] as LearningIntent[]).map((intent) => (
                       <button key={intent} className="intent-toggle" onClick={() => handleGenerateCourse(intent)} disabled={isBusy}>
@@ -559,15 +724,17 @@ export function LearningWorkbench() {
                   ) : null}
                 </>
               ) : (
-                <p className="empty-state">生成后，这里会显示它把材料识别成什么、建议用什么学习方式、会拆成几章几道练习。</p>
+                <p className="empty-state">
+                  解析材料后，这里会显示系统检索出的论点、证据、概念、可练习问题和误解风险。你先确认它读到了什么，再把它转成学习路径。
+                </p>
               )}
             </section>
 
             <section className="panel play-panel">
               <div className="panel-head">
                 <div>
-                  <p className="eyebrow">PLAY / LEARN</p>
-                  <h3>按步骤检查理解</h3>
+                  <p className="eyebrow">3 LEARNING PATH</p>
+                  <h3>按转换后的路径学习</h3>
                 </div>
               </div>
               {activeRun && currentActivity ? (
@@ -663,15 +830,15 @@ export function LearningWorkbench() {
               ) : activeRun && activeRun.course_status === "completed" ? (
                 <p className="empty-state">这轮课程已完成。右侧已经生成回访计划，下一步是复盘与迁移，而不是停在总结。</p>
               ) : (
-                <p className="empty-state">生成课程后，这里会直接出现第一个学习节点。你需要选择、回答或复盘，系统会根据结果推进进度。</p>
+                <p className="empty-state">把材料检索结果转成学习路径后，这里会出现第一个学习节点。你需要选择、回答或复盘，系统会根据结果推进进度。</p>
               )}
             </section>
 
             <section className="panel review-panel">
               <div className="panel-head">
                 <div>
-                  <p className="eyebrow">REVIEW / HISTORY</p>
-                  <h3>历史记录与后续复习</h3>
+                  <p className="eyebrow">4 REVIEW / HISTORY</p>
+                  <h3>学习记录与后续复习</h3>
                 </div>
               </div>
               <div className="review-columns">

@@ -3,8 +3,8 @@ import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "像素化深度学习工作台",
-  description: "把论文、报告和课程笔记，变成可以跟着做的学习练习。",
+  title: "材料学习转换器",
+  description: "把 PDF、报告和课程笔记解析成结构化检索结果，再转换成可以跟着做的学习路径。",
 };
 
 export default function RootLayout({
