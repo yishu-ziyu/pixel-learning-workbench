@@ -30,7 +30,8 @@ import type {
 } from "@/types/api";
 
 const sessionStorageKey = "pixel-learning-session";
-type WorkbenchStage = "input" | "retrieval" | "path" | "review";
+type WorkbenchStage = "input" | "analysis" | "learning_pack" | "study_mode" | "review";
+type LearningModeId = "immersive_reading" | "structure_map" | "quiz";
 const sampleText = `Abstract
 This paper studies how game-based micro-learning improves long-term retention for complex reading tasks.
 
@@ -57,7 +58,7 @@ const productPromise = [
   },
   {
     title: "转成学习形态",
-    body: "再把检索结果转换成练习路径、追问、选择题、复盘和后续复习计划。",
+    body: "再把同一份材料转换成沉浸阅读、结构图、理解测验和后续复习计划。",
   },
   {
     title: "跟着练习复习",
@@ -71,7 +72,7 @@ function flattenActivities(blueprint?: CourseBlueprint): Activity[] {
 }
 
 function formatIntent(intent: LearningIntent): string {
-  return intent === "deep_read" ? "深度解读" : intent === "logic_breakdown" ? "逻辑拆解" : "课程化学习";
+  return intent === "deep_read" ? "深度解读" : intent === "logic_breakdown" ? "逻辑拆解" : "系统学习";
 }
 
 function formatFacet(facet: string): string {
@@ -111,13 +112,22 @@ function formatActivityType(type: string): string {
   return labels[type] ?? type;
 }
 
+function formatLearningMode(mode: LearningModeId | null): string {
+  const labels: Record<LearningModeId, string> = {
+    immersive_reading: "沉浸阅读",
+    structure_map: "结构图",
+    quiz: "理解测验",
+  };
+  return mode ? labels[mode] : "学习形态";
+}
+
 function activityInstruction(type: ActivityType): string {
   const instructions: Record<ActivityType, string> = {
-    scene: "读完这张情境卡，确认自己知道材料正在讨论什么。",
-    explain: "读完这段最小讲解，抓住一个核心结论和它的依据。",
-    probe: "用自己的话写出理解，至少 12 字；重点写逻辑、证据或边界。",
-    challenge: "先选择一个答案，再提交；系统会根据结果继续推进。",
-    reflect: "写下本轮收获、卡住点或迁移场景，至少 12 字。",
+    scene: "先看本卡片里的“材料原文 / 解析片段”和“系统抽出的结构”，确认这段材料在讨论什么。",
+    explain: "先看材料片段，再看最小讲解，抓住一个核心结论和它的依据。",
+    probe: "根据上方材料片段，用自己的话写出理解，至少 12 字；重点写逻辑、证据或边界。",
+    challenge: "根据上方材料片段和结构节点选择一个答案，再提交。",
+    reflect: "回看上方材料依据，写下本轮收获、卡住点或迁移场景，至少 12 字。",
   };
   return instructions[type];
 }
@@ -142,12 +152,59 @@ function formatConfidence(value: "low" | "medium" | "high"): string {
   return labels[value];
 }
 
+function buildActivitySourceContext(activity: Activity | null, blueprint?: CourseBlueprint | null) {
+  if (!activity) return null;
+  const chapterIndex = blueprint?.chapters.findIndex((chapter) => chapter.activities.some((entry) => entry.id === activity.id)) ?? -1;
+  const fallbackNode = blueprint?.learning_representation.argument_graph[Math.max(0, chapterIndex)] ?? blueprint?.learning_representation.argument_graph[0];
+  const fallbackTarget = blueprint?.learning_representation.question_targets[Math.max(0, chapterIndex)] ?? blueprint?.learning_representation.question_targets[0];
+  const sourceContext = activity.source_context;
+  const excerpt =
+    sourceContext?.material_excerpt ||
+    activity.key_points?.find((point) => point.trim().length > 0) ||
+    recordText(fallbackNode ?? {}, "detail", activity.body);
+  const graphLabel = sourceContext?.graph_label || recordText(fallbackNode ?? {}, "label", "材料结构节点");
+  const graphDetail = sourceContext?.graph_detail || recordText(fallbackNode ?? {}, "detail", "系统会把这里作为当前练习的依据。");
+  const questionTarget = sourceContext?.question_target || recordText(fallbackTarget ?? {}, "prompt", "确认这一段到底需要被理解什么。");
+
+  return {
+    sectionHeading: sourceContext?.section_heading || (chapterIndex >= 0 ? blueprint?.chapters[chapterIndex]?.title : undefined) || activity.title,
+    materialExcerpt: excerpt,
+    graphLabel,
+    graphDetail,
+    questionTarget,
+    whyThisStep:
+      sourceContext?.why_this_step ||
+      (activity.type === "challenge"
+        ? "把材料结构变成一次可判定的选择，检查你有没有抓住重点。"
+        : activity.type === "probe" || activity.type === "reflect"
+          ? "让你用自己的话重建材料逻辑，而不是停在看过的感觉里。"
+          : "先把材料里的真实内容放到眼前，再进行下一步学习动作。"),
+  };
+}
+
+function shouldShowActivityBody(activity: Activity, hasSourceContext: boolean): boolean {
+  if (!activity.body.trim()) return false;
+  if (activity.type !== "scene") return true;
+  if (!hasSourceContext) return true;
+  return false;
+}
+
 function recordText(entry: Record<string, unknown>, key: string, fallback = ""): string {
   const value = entry[key];
   if (typeof value === "string") return value;
   if (typeof value === "number") return String(value);
   if (Array.isArray(value)) return value.filter((item) => typeof item === "string" || typeof item === "number").join("、");
   return fallback;
+}
+
+function truncateText(value: string, limit: number): string {
+  if (value.length <= limit) return value;
+  return `${value.slice(0, limit).trim()}...`;
+}
+
+function metadataText(metadata: Record<string, unknown>, key: string, fallback = ""): string {
+  const value = metadata[key];
+  return typeof value === "string" && value.trim() ? value : fallback;
 }
 
 function formatGraphKind(kind: string): string {
@@ -165,6 +222,7 @@ export function LearningWorkbench() {
   const [email, setEmail] = useState("learner@example.com");
   const [magicPreview, setMagicPreview] = useState<{ token: string; link: string } | null>(null);
   const [inputText, setInputText] = useState(sampleText);
+  const [inputUrl, setInputUrl] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -179,15 +237,75 @@ export function LearningWorkbench() {
   const [freeTextAnswer, setFreeTextAnswer] = useState("");
   const [selectedChoice, setSelectedChoice] = useState<number | null>(null);
   const [activeStage, setActiveStage] = useState<WorkbenchStage>("input");
+  const [selectedLearningMode, setSelectedLearningMode] = useState<LearningModeId | null>(null);
+  const [selectedStructureNodeId, setSelectedStructureNodeId] = useState<string | null>(null);
 
   const activities = useMemo(() => flattenActivities(activeRun?.blueprint), [activeRun]);
-  const currentActivity = activeRun ? activities[activeRun.current_activity_index] ?? null : null;
+  const readingItems = useMemo(() => activities.filter((activity) => activity.type === "scene" || activity.type === "explain" || activity.type === "reflect"), [activities]);
+  const quizItems = useMemo(() => activities.filter((activity) => activity.type === "probe" || activity.type === "challenge"), [activities]);
+  const structureNodes = blueprint?.learning_representation.argument_graph ?? analyzeResult?.learning_representation.argument_graph ?? [];
+  const conceptNodes = blueprint?.learning_representation.concept_map ?? analyzeResult?.learning_representation.concept_map ?? [];
+  const questionTargets = blueprint?.learning_representation.question_targets ?? analyzeResult?.learning_representation.question_targets ?? [];
+  const selectedStructureNode =
+    structureNodes.find((node) => recordText(node, "id", recordText(node, "label", "")) === selectedStructureNodeId) ?? structureNodes[0] ?? null;
+  const selectedStructureNodeIndex = selectedStructureNode ? Math.max(0, structureNodes.indexOf(selectedStructureNode)) : 0;
+  const selectedStructureQuestion = questionTargets[selectedStructureNodeIndex] ?? questionTargets[0] ?? null;
+  const learningModes = useMemo(
+    () => [
+      {
+        id: "immersive_reading" as const,
+        title: "沉浸阅读",
+        description: "按材料顺序阅读关键片段，并用小检查确认自己读懂了什么。",
+        itemCount: Math.max(1, readingItems.length),
+        sourceCoverageLabel: blueprint ? `${blueprint.cover.chapter_count} 个材料章节` : "等待学习包",
+      },
+      {
+        id: "structure_map" as const,
+        title: "结构图",
+        description: "先看系统抽出的论点、证据、概念和问题目标，再点开节点回到材料依据。",
+        itemCount: blueprint?.learning_representation.argument_graph.length ?? analyzeResult?.learning_representation.argument_graph.length ?? 0,
+        sourceCoverageLabel: "结构节点与原文片段",
+      },
+      {
+        id: "quiz" as const,
+        title: "理解测验",
+        description: "用少量问题检查概念边界、逻辑关系和迁移理解，答完后显示材料证据。",
+        itemCount: Math.max(1, quizItems.length),
+        sourceCoverageLabel: blueprint ? `${blueprint.learning_representation.question_targets.length} 个可验证问题` : "等待学习包",
+      },
+    ],
+    [analyzeResult?.learning_representation.argument_graph.length, blueprint, quizItems.length, readingItems.length],
+  );
+  const completedActivityIds = activeRun?.mastery_state.completed_activity_ids ?? [];
+  const selectedModeActivities =
+    selectedLearningMode === "immersive_reading"
+      ? readingItems
+      : selectedLearningMode === "quiz"
+        ? quizItems
+        : [];
+  const currentActivity = activeRun
+    ? selectedLearningMode
+      ? selectedModeActivities.find((activity) => !completedActivityIds.includes(activity.id)) ?? selectedModeActivities[0] ?? null
+      : activities[activeRun.current_activity_index] ?? null
+    : null;
+  const currentActivitySource = useMemo(
+    () => buildActivitySourceContext(currentActivity, activeRun?.blueprint),
+    [activeRun?.blueprint, currentActivity],
+  );
+  const showCurrentActivityBody = Boolean(currentActivity && shouldShowActivityBody(currentActivity, Boolean(currentActivitySource)));
   const progressRatio = activeRun && activities.length > 0 ? activeRun.current_activity_index / activities.length : 0;
   const currentRubricFacets = currentActivity?.rubric?.required_facets ?? [];
   const currentRubricKeywords = currentActivity?.rubric?.expected_keywords ?? currentActivity?.expected_keywords ?? [];
   const incompleteRuns = runs.filter((run) => run.course_status !== "completed");
+  const materialTitle = analyzeResult ? metadataText(analyzeResult.parsed_document.metadata, "title", "未命名材料") : "";
+  const materialSourceName = analyzeResult ? metadataText(analyzeResult.parsed_document.metadata, "source_name", "文本输入") : "";
+  const materialSummary = analyzeResult
+    ? truncateText(analyzeResult.parsed_document.paragraphs.slice(0, 2).join(" "), 220) || "系统还没有抽取到可展示摘要。"
+    : "";
   const textLength = inputText.trim().length;
-  const canUseMaterial = Boolean(selectedFile) || inputText.trim().length >= 80;
+  const trimmedUrl = inputUrl.trim();
+  const hasUrl = /^https?:\/\/\S+\.\S+/.test(trimmedUrl);
+  const canUseMaterial = Boolean(selectedFile) || hasUrl || inputText.trim().length >= 80;
   const canSubmitCurrentActivity =
     Boolean(activeRun && currentActivity) &&
     !isBusy &&
@@ -198,59 +316,102 @@ export function LearningWorkbench() {
         : true);
   const materialReadiness = selectedFile
     ? { title: "文件已就绪", detail: selectedFile.name }
-    : textLength >= 80
-      ? { title: "文本已就绪", detail: `${textLength} 字，可以开始解析` }
-      : textLength > 0
-        ? { title: "文本偏短", detail: `当前 ${textLength} 字，至少需要 80 字` }
-        : { title: "等待材料", detail: "粘贴文本或上传文件" };
+    : hasUrl
+      ? { title: "网页已就绪", detail: trimmedUrl }
+      : trimmedUrl
+        ? { title: "网页地址待确认", detail: "请使用 http:// 或 https:// 开头的完整网址" }
+        : textLength >= 80
+          ? { title: "文本已就绪", detail: `${textLength} 字，可以开始解析` }
+          : textLength > 0
+            ? { title: "文本偏短", detail: `当前 ${textLength} 字，至少需要 80 字` }
+            : { title: "等待材料", detail: "粘贴文本、输入网页地址或上传文件" };
   const stageAvailability: Record<WorkbenchStage, boolean> = {
     input: Boolean(session),
-    retrieval: Boolean(session && analyzeResult),
-    path: Boolean(session && activeRun),
+    analysis: Boolean(session && analyzeResult),
+    learning_pack: Boolean(session && activeRun),
+    study_mode: Boolean(session && activeRun && selectedLearningMode),
     review: Boolean(session && (reviewPlans.length || activeRun?.course_status === "completed" || runs.some((run) => run.course_status === "completed"))),
   };
   const nextStep = (() => {
     if (!session) return "打开示例材料";
-    if (currentActivity) return `完成本步练习：${currentActivity.title}`;
     if (activeRun?.course_status === "completed") return "查看复习";
     if (!analyzeResult) return "输入并解析材料";
-    if (!activeRun) return "转成学习路径";
+    if (!activeRun) return "生成学习包";
+    if (!selectedLearningMode) return "选择一种学习形态";
+    if (selectedLearningMode === "structure_map") return "查看结构图并选择下一种学习形态";
+    if (currentActivity) return `完成本步学习：${currentActivity.title}`;
     return "查看复习";
   })();
   const workflowStatus = [
     {
       stage: "input" as const,
       label: "输入材料",
-      body: selectedFile ? selectedFile.name : inputText.trim() ? `${inputText.trim().length} 字文本` : "等待材料",
+      body: selectedFile ? selectedFile.name : hasUrl ? trimmedUrl : inputText.trim() ? `${inputText.trim().length} 字文本` : "等待材料",
+      intent: "把原始材料交给系统，先不生成内容。",
+      action: "粘贴文本、输入网页地址，或上传 PDF / DOCX / TXT / MD。",
+      done: "材料来源有效，按钮变为可解析。",
+      proof: "输入状态会显示文本已就绪、网页已就绪或文件已就绪。",
       state: session ? (analyzeResult || activeRun ? "done" : "active") : "pending",
     },
     {
-      stage: "retrieval" as const,
-      label: "检索结构",
+      stage: "analysis" as const,
+      label: "材料分析",
       body: analyzeResult
         ? `${analyzeResult.learning_representation.argument_graph.length} 个结构节点`
         : activeRun
-          ? "历史课程已生成"
+          ? "历史学习包已生成"
           : "解析后显示论点、证据和概念",
+      intent: "让用户先看到系统从材料里读出了什么。",
+      action: "检查标题、摘要、来源、结构节点、问题目标和误解风险。",
+      done: "你能判断这份材料是否被正确理解，再决定生成学习包。",
+      proof: "页面会显示材料封面、关键词、结构节点和可练习问题。",
       state: analyzeResult ? (activeRun ? "done" : "active") : activeRun ? "done" : "pending",
     },
     {
-      stage: "path" as const,
-      label: "跟着练习",
-      body: currentActivity
-        ? `${formatActivityType(currentActivity.type)}：${activitySubmitLabel(currentActivity.type)}`
+      stage: "learning_pack" as const,
+      label: "学习包",
+      body: activeRun
+        ? `3 种形态 / ${activities.length} 个学习项`
+        : analyzeResult
+          ? "可生成阅读、结构图和测验"
+          : "等待材料分析",
+      intent: "把同一份材料转换成几种可学习形态。",
+      action: "选择沉浸阅读、结构图或理解测验中的一种进入。",
+      done: "学习包显示三种形态，并且每种都说明来源覆盖和学习项数量。",
+      proof: "学习形态卡会显示学习项数量、用途和进入按钮。",
+      state: activeRun ? (selectedLearningMode ? "done" : "active") : analyzeResult ? "active" : "pending",
+    },
+    {
+      stage: "study_mode" as const,
+      label: "开始学习",
+      body: !selectedLearningMode
+        ? "先选择一种学习形态"
+        : currentActivity
+        ? `${formatLearningMode(selectedLearningMode)}：${activitySubmitLabel(currentActivity.type)}`
+        : selectedLearningMode === "structure_map"
+          ? "结构图：点节点看材料依据"
         : blueprint
-          ? `${blueprint.cover.chapter_count} 章 / ${blueprint.cover.activity_count} 个节点`
-          : "等待转换",
-      state: activeRun ? (currentActivity ? "active" : "done") : analyzeResult ? "active" : "pending",
+          ? `${formatLearningMode(selectedLearningMode)} 已就绪`
+          : "等待学习包",
+      intent: "只进入一种学习形态，避免把所有功能堆给用户。",
+      action: "按当前卡片要求阅读、点结构节点、选择答案或写短答。",
+      done: "当前卡显示原文依据、学习目标、用户动作和提交反馈。",
+      proof: "学习卡片会显示来源片段、检查目标、操作按钮和反馈结果。",
+      state: activeRun ? (selectedLearningMode ? "active" : "pending") : "pending",
     },
     {
       stage: "review" as const,
       label: "复习回访",
       body: reviewPlans.length ? "查看复习计划" : activeRun?.course_status === "completed" ? "查看掌握度" : "学习完成后出现",
+      intent: "把错题、低把握和弱概念变成下一次复习任务。",
+      action: "查看为什么复习这些，再按 D+1 / D+3 / D+7 回访。",
+      done: "复习卡显示原因，而不是只给一个日期。",
+      proof: "复习计划会显示“为什么复习这些”和对应原因。",
       state: reviewPlans.length || activeRun?.course_status === "completed" ? "active" : activeRun ? "pending" : "pending",
     },
   ];
+  const activeWorkflowStep = workflowStatus.find((step) => step.stage === activeStage) ?? workflowStatus[0];
+  const isFocusedStudyMode = Boolean(session && activeStage === "study_mode" && activeRun && selectedLearningMode);
   const primaryCommand: {
     label: string;
     title: string;
@@ -261,11 +422,28 @@ export function LearningWorkbench() {
     ? {
         label: isBusy ? "正在准备..." : "打开示例材料",
         title: "先看系统如何检索一份材料",
-        body: "不需要先配置账号。先看材料结构，再决定是否转换成学习路径。",
+        body: "不需要先配置账号。先看材料结构，再决定是否生成学习包。",
         onSelect: handleOpenSampleCourse,
         disabled: isBusy,
       }
-    : currentActivity
+    : activeRun?.course_status === "completed"
+      ? {
+          label: "查看复习",
+          title: "这轮学习已完成",
+          body: reviewPlans.length ? "后续回访已经生成，下一步是按计划复习。" : "等待新的材料或历史学习包。",
+          onSelect: () => setActiveStage("review"),
+        }
+    : selectedLearningMode === "structure_map" && activeRun
+      ? {
+          label: "进入理解测验",
+          title: "当前任务：看懂材料结构",
+          body: "先点结构节点，看它对应的材料片段、结构角色和检查问题；看懂后进入测验验证。",
+          onSelect: () => {
+            setSelectedLearningMode("quiz");
+            setActiveStage("study_mode");
+          },
+        }
+    : currentActivity && selectedLearningMode
       ? {
           label: activitySubmitLabel(currentActivity.type),
           title: `当前任务：完成这一小步`,
@@ -273,7 +451,7 @@ export function LearningWorkbench() {
           onSelect: handleSubmitCurrentActivity,
           disabled: !canSubmitCurrentActivity,
         }
-    : !analyzeResult
+      : !analyzeResult
       ? {
           label: isBusy ? "解析中..." : "解析材料",
           title: "当前任务：让系统读材料",
@@ -283,16 +461,24 @@ export function LearningWorkbench() {
         }
       : !activeRun
         ? {
-            label: isBusy ? "生成中..." : "转成学习路径",
-            title: "当前任务：选择学习形态",
-            body: `${analyzeResult.learning_representation.argument_graph.length} 个结构节点已就绪，可以生成练习路径。`,
+            label: isBusy ? "生成中..." : "生成学习包",
+            title: "当前任务：把材料转成学习包",
+            body: `${analyzeResult.learning_representation.argument_graph.length} 个结构节点已就绪，可以生成阅读、结构图和测验。`,
             onSelect: () => handleGenerateCourse(),
             disabled: isBusy,
           }
+        : !selectedLearningMode
+          ? {
+              label: "选择学习形态",
+              title: "当前任务：选择一种学习方式",
+              body: "学习包已经生成。先选沉浸阅读、结构图或理解测验，不要直接掉进一堆卡片。",
+              onSelect: () => setActiveStage("learning_pack"),
+            }
           : {
-              label: "查看复习",
-              title: "这轮学习已完成",
-              body: reviewPlans.length ? "后续回访已经生成，下一步是按计划复习。" : "等待新的材料或历史课程。",
+              label: "继续学习",
+              title: "当前任务：继续当前学习形态",
+              body: currentActivity ? activityInstruction(currentActivity.type) : "学习项已经完成。",
+              onSelect: () => setActiveStage("study_mode"),
             };
 
   async function refreshDashboard(token = session?.session_token) {
@@ -370,10 +556,11 @@ export function LearningWorkbench() {
       const run = await getCourseRun(runId, session.session_token);
       setActiveRun(run);
       setBlueprint(run.blueprint);
-      setActiveStage(run.course_status === "completed" ? "review" : "path");
-      setInfoMessage(`已切换到课程：${run.title}`);
+      setSelectedLearningMode(null);
+      setActiveStage(run.course_status === "completed" ? "review" : "learning_pack");
+      setInfoMessage(`已切换到学习包：${run.title}`);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "读取课程失败");
+      setError(cause instanceof Error ? cause.message : "读取学习包失败");
     }
   }
 
@@ -394,22 +581,24 @@ export function LearningWorkbench() {
   async function createCourseFromSource(
     token: string,
     intentOverride?: LearningIntent,
-    source: { text?: string; file?: File | null } = {},
+    source: { text?: string; url?: string; file?: File | null } = {},
   ) {
     const prepared = await prepareMaterialFromSource(token, source);
     await createLearningPathFromPrepared(token, prepared.assetId, prepared.analyzed, intentOverride);
   }
 
-  async function prepareMaterialFromSource(token: string, source: { text?: string; file?: File | null } = {}) {
+  async function prepareMaterialFromSource(token: string, source: { text?: string; url?: string; file?: File | null } = {}) {
     const file = source.file === undefined ? selectedFile : source.file;
-    const text = file ? undefined : source.text ?? inputText;
-    const asset = await createAsset({ text, file: file ?? undefined }, token);
+    const url = file ? undefined : source.url ?? (trimmedUrl ? trimmedUrl : undefined);
+    const text = file || url ? undefined : source.text ?? inputText;
+    const asset = await createAsset({ text, url, file: file ?? undefined }, token);
     const analyzed = await analyzeAsset(asset.asset_id, token);
     setPreparedAssetId(asset.asset_id);
     setAnalyzeResult(analyzed);
     setBlueprint(null);
     setActiveRun(null);
-    setActiveStage("retrieval");
+    setSelectedLearningMode(null);
+    setActiveStage("analysis");
     setFreeTextAnswer("");
     setSelectedChoice(null);
     return { assetId: asset.asset_id, analyzed };
@@ -426,7 +615,8 @@ export function LearningWorkbench() {
     setBlueprint(blueprintResponse.blueprint);
     const run = await createCourseRun(assetId, intent, blueprintResponse.blueprint, token);
     setActiveRun(run);
-    setActiveStage("path");
+    setSelectedLearningMode(null);
+    setActiveStage("learning_pack");
     setFreeTextAnswer("");
     setSelectedChoice(null);
     await refreshDashboard(token);
@@ -437,6 +627,7 @@ export function LearningWorkbench() {
     setAnalyzeResult(null);
     setBlueprint(null);
     setActiveRun(null);
+    setSelectedLearningMode(null);
     setActiveStage("input");
     setFreeTextAnswer("");
     setSelectedChoice(null);
@@ -465,6 +656,7 @@ export function LearningWorkbench() {
       const trialEmail = email.trim() || "learner@example.com";
       setEmail(trialEmail);
       setInputText(sampleText);
+      setInputUrl("");
       setSelectedFile(null);
       const response = await requestMagicLink(trialEmail);
       const verified = await verifyMagicLink(response.preview_token);
@@ -475,7 +667,7 @@ export function LearningWorkbench() {
       await trackProductEvent("first_run_sample_started", { entry: "sample_course" }, verified.session_token);
       const prepared = await prepareMaterialFromSource(verified.session_token, { text: sampleText, file: null });
       setInfoMessage(
-        `示例材料已解析：系统检索到 ${prepared.analyzed.learning_representation.argument_graph.length} 个结构节点。下一步你可以把它转成学习路径。`,
+        `示例材料已解析：系统检索到 ${prepared.analyzed.learning_representation.argument_graph.length} 个结构节点。下一步你可以生成学习包。`,
       );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "打开示例材料失败");
@@ -494,9 +686,9 @@ export function LearningWorkbench() {
       } else {
         await createCourseFromSource(session.session_token, intentOverride);
       }
-      setInfoMessage("学习路径已生成。你可以从第一步开始，也可以稍后继续。");
+      setInfoMessage("学习包已生成。请选择沉浸阅读、结构图或理解测验。");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "生成学习路径失败");
+      setError(cause instanceof Error ? cause.message : "生成学习包失败");
     } finally {
       setIsBusy(false);
     }
@@ -545,6 +737,8 @@ export function LearningWorkbench() {
       setBlueprint(response.course_run.blueprint);
       if (response.course_run.course_status === "completed") {
         setActiveStage("review");
+      } else {
+        setActiveStage("study_mode");
       }
       setFreeTextAnswer("");
       setSelectedChoice(null);
@@ -582,10 +776,13 @@ export function LearningWorkbench() {
   function resetSession() {
     setSession(null);
     setMagicPreview(null);
+    setInputUrl("");
+    setSelectedFile(null);
     setPreparedAssetId(null);
     setAnalyzeResult(null);
     setBlueprint(null);
     setActiveRun(null);
+    setSelectedLearningMode(null);
     setRuns([]);
     setReviewPlans([]);
     setActiveStage("input");
@@ -593,12 +790,12 @@ export function LearningWorkbench() {
   }
 
   return (
-    <main className="app-shell">
+    <main className={isFocusedStudyMode ? "app-shell focus-study-shell" : "app-shell"}>
       {!session ? (
         <section className="hero-strip">
           <div>
             <p className="eyebrow">MATERIAL LEARNING CONVERTER</p>
-            <h1>把 PDF、报告和长文，转换成可学习的练习路径。</h1>
+            <h1>把 PDF、报告和长文，转换成可学习的学习包。</h1>
             <p className="hero-copy">
               这个产品的主线很简单：你输入材料，系统先检索材料内部的论点、证据和概念，再把它们变成追问、测验、复盘和复习计划。
             </p>
@@ -627,11 +824,11 @@ export function LearningWorkbench() {
             </div>
           </div>
         </section>
-      ) : (
+      ) : isFocusedStudyMode ? null : (
         <section className="workspace-intro">
           <div>
             <p className="eyebrow">MATERIAL LEARNING CONVERTER</p>
-            <h1>今天只做一件事：把材料变成可练习的学习路径。</h1>
+            <h1>今天只做一件事：把材料变成可学习的学习包。</h1>
           </div>
           <div className="next-step-card">
             <span>当前下一步</span>
@@ -645,7 +842,7 @@ export function LearningWorkbench() {
           <div className="login-copy">
             <p className="eyebrow">START</p>
             <h2>先看一个完整例子</h2>
-            <p>你不需要先理解所有功能。打开示例材料，先看系统如何检索结构，再亲手把它转换成学习路径。</p>
+            <p>你不需要先理解所有功能。打开示例材料，先看系统如何检索结构，再亲手把它转换成阅读、结构图和测验。</p>
             <div className="trial-note">
               <strong>本地试用记录</strong>
               <span>系统会在本机保存进度，方便你退出后继续。你可以随时退出。</span>
@@ -681,55 +878,81 @@ export function LearningWorkbench() {
         </section>
       ) : (
         <>
-          <header className="toolbar">
-            <div>
-              <p className="eyebrow">WELCOME BACK</p>
-              <h2>{session.user.display_name} 的材料学习转换器</h2>
-            </div>
-            <div className="toolbar-meta">
-              <span>{session.user.email}</span>
-              {runs.length ? (
-                <button className="secondary-button" onClick={handleResumeLatestRun} disabled={isBusy}>
-                  继续学习
+          {!isFocusedStudyMode ? (
+            <header className="toolbar">
+              <div>
+                <p className="eyebrow">WELCOME BACK</p>
+                <h2>{session.user.display_name} 的材料学习转换器</h2>
+              </div>
+              <div className="toolbar-meta">
+                <span>{session.user.email}</span>
+                {runs.length ? (
+                  <button className="secondary-button" onClick={handleResumeLatestRun} disabled={isBusy}>
+                    继续学习
+                  </button>
+                ) : null}
+                <button className="secondary-button" onClick={resetSession}>
+                  退出
                 </button>
-              ) : null}
-              <button className="secondary-button" onClick={resetSession}>
-                退出
-              </button>
-            </div>
-          </header>
+              </div>
+            </header>
+          ) : null}
 
           {error ? <div className="status-banner error-banner">{error}</div> : null}
-          {infoMessage ? <div className="status-banner info-banner">{infoMessage}</div> : null}
+          {!isFocusedStudyMode && infoMessage ? <div className="status-banner info-banner">{infoMessage}</div> : null}
 
-          <section className="workflow-status" aria-label="当前工作流状态">
-            {workflowStatus.map((step, index) => (
-              <button
-                key={step.label}
-                className={`flow-step ${step.state} ${activeStage === step.stage ? "selected" : ""}`}
-                disabled={!stageAvailability[step.stage]}
-                onClick={() => setActiveStage(step.stage)}
-                type="button"
-              >
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <strong>{step.label}</strong>
-                <p>{step.body}</p>
-              </button>
-            ))}
-          </section>
+          {!isFocusedStudyMode ? (
+            <>
+              <section className="workflow-status" aria-label="当前工作流状态">
+                {workflowStatus.map((step, index) => (
+                  <button
+                    key={step.label}
+                    className={`flow-step ${step.state} ${activeStage === step.stage ? "selected" : ""}`}
+                    disabled={!stageAvailability[step.stage]}
+                    onClick={() => setActiveStage(step.stage)}
+                    type="button"
+                  >
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <strong>{step.label}</strong>
+                    <p>{step.body}</p>
+                    <small>意图：{step.intent}</small>
+                  </button>
+                ))}
+              </section>
 
-          <section className="command-bar" aria-label="当前任务">
-            <div>
-              <span>当前主任务</span>
-              <strong>{primaryCommand.title}</strong>
-              <p>{primaryCommand.body}</p>
-            </div>
-            {primaryCommand.onSelect ? (
-              <button className="pixel-button command-button" onClick={primaryCommand.onSelect} disabled={primaryCommand.disabled}>
-                {primaryCommand.label}
-              </button>
-            ) : null}
-          </section>
+              <section className="command-bar" aria-label="当前任务">
+                <div>
+                  <span>当前主任务</span>
+                  <strong>{primaryCommand.title}</strong>
+                  <p>{primaryCommand.body}</p>
+                </div>
+                {primaryCommand.onSelect ? (
+                  <button className="pixel-button command-button" onClick={primaryCommand.onSelect} disabled={primaryCommand.disabled}>
+                    {primaryCommand.label}
+                  </button>
+                ) : null}
+              </section>
+
+              <section className="workflow-guide-panel" aria-label="当前步骤意图">
+                <div>
+                  <span>当前步骤意图</span>
+                  <strong>{activeWorkflowStep.intent}</strong>
+                </div>
+                <div>
+                  <span>用户现在要做什么</span>
+                  <p>{activeWorkflowStep.action}</p>
+                </div>
+                <div>
+                  <span>完成标准</span>
+                  <p>{activeWorkflowStep.done}</p>
+                </div>
+                <div>
+                  <span>可见证据</span>
+                  <p>{activeWorkflowStep.proof}</p>
+                </div>
+              </section>
+            </>
+          ) : null}
 
           <div className="workspace-grid serial-workspace">
             <section className={activeStage === "input" ? "panel input-panel active-stage-panel" : "panel input-panel hidden-stage-panel"}>
@@ -742,6 +965,7 @@ export function LearningWorkbench() {
                   className="secondary-button"
                   onClick={() => {
                     setInputText(sampleText);
+                    setInputUrl("");
                     setSelectedFile(null);
                     clearPreparedMaterial();
                   }}
@@ -762,18 +986,36 @@ export function LearningWorkbench() {
                 value={inputText}
                 onChange={(event) => {
                   setInputText(event.target.value);
+                  if (event.target.value.trim()) setInputUrl("");
                   clearPreparedMaterial();
                 }}
-                placeholder="粘贴论文、长文或课程笔记..."
-                disabled={Boolean(selectedFile)}
+                placeholder="粘贴论文、长文或学习笔记..."
+                disabled={Boolean(selectedFile) || hasUrl}
               />
+              <label className="url-input-field" htmlFor="material-url">
+                <span>或者输入网页地址</span>
+                <input
+                  id="material-url"
+                  type="url"
+                  value={inputUrl}
+                  onChange={(event) => {
+                    setInputUrl(event.target.value);
+                    if (event.target.value.trim()) setSelectedFile(null);
+                    clearPreparedMaterial();
+                  }}
+                  placeholder="https://example.com/article"
+                  disabled={Boolean(selectedFile)}
+                />
+              </label>
               <label className="file-picker">
                 <span>{selectedFile ? `已选择：${selectedFile.name}` : "或者上传 PDF / DOCX / TXT / MD"}</span>
                 <input
                   type="file"
                   accept=".pdf,.docx,.txt,.md"
                   onChange={(event) => {
-                    setSelectedFile(event.target.files?.[0] ?? null);
+                    const file = event.target.files?.[0] ?? null;
+                    setSelectedFile(file);
+                    if (file) setInputUrl("");
                     clearPreparedMaterial();
                   }}
                 />
@@ -787,40 +1029,53 @@ export function LearningWorkbench() {
                   }}
                   disabled={isBusy}
                 >
-                  清除文件，改用粘贴文本
+                  清除文件，改用粘贴文本或网页
                 </button>
               ) : null}
               <div className="intent-hints">
                 <span>论文：拆论点和证据</span>
                 <span>报告：抓结论和边界</span>
-                <span>笔记：变成练习课</span>
+                <span>笔记：变成复习包</span>
               </div>
               <button className="pixel-button" disabled={isBusy || !canUseMaterial} onClick={handleAnalyzeMaterial}>
                 {isBusy ? "解析中..." : "解析并检索这份材料"}
               </button>
               {analyzeResult ? (
                 <button className="secondary-button" disabled={isBusy} onClick={() => handleGenerateCourse()}>
-                  转成学习路径
+                  生成学习包
                 </button>
               ) : null}
             </section>
 
-            <section className={activeStage === "retrieval" ? "panel studio-panel active-stage-panel" : "panel studio-panel hidden-stage-panel"}>
+            <section className={activeStage === "analysis" ? "panel studio-panel active-stage-panel" : "panel studio-panel hidden-stage-panel"}>
               <div className="panel-head">
                 <div>
-                  <p className="eyebrow">2 MATERIAL RETRIEVAL</p>
+                  <p className="eyebrow">2 MATERIAL ANALYSIS</p>
                   <h3>系统从材料里检索到了什么</h3>
                 </div>
               </div>
               {analyzeResult ? (
                 <>
-                  <div className="retrieval-summary">
-                    <strong>检索结果摘要</strong>
-                    <p>
-                      系统已经把材料解析为 {analyzeResult.parsed_document.sections.length} 个段落区块、
-                      {analyzeResult.parsed_document.paragraphs.length} 段正文，并抽取出{" "}
-                      {analyzeResult.learning_representation.keywords.length} 个关键词。
-                    </p>
+                  <div className="material-analysis-cover">
+                    <div>
+                      <span>材料标题</span>
+                      <strong>{materialTitle}</strong>
+                      <p>{materialSummary}</p>
+                    </div>
+                    <dl>
+                      <div>
+                        <dt>来源</dt>
+                        <dd>{materialSourceName}</dd>
+                      </div>
+                      <div>
+                        <dt>结构</dt>
+                        <dd>{analyzeResult.parsed_document.sections.length} 个段落区块</dd>
+                      </div>
+                      <div>
+                        <dt>关键词</dt>
+                        <dd>{analyzeResult.learning_representation.keywords.length} 个</dd>
+                      </div>
+                    </dl>
                   </div>
                   <div className="meta-grid">
                     <div className="meta-card">
@@ -887,11 +1142,11 @@ export function LearningWorkbench() {
                   {analyzeResult.follow_up_question ? <p className="follow-up">{analyzeResult.follow_up_question}</p> : null}
                   <div className="format-strip">
                     <div>
-                      <strong>下一步：选择学习形态</strong>
-                      <span>默认用推荐模式，也可以改成深度解读、逻辑拆解或课程化学习。</span>
+                      <strong>下一步：生成学习包</strong>
+                      <span>同一份材料会被转成沉浸阅读、结构图和理解测验，用户再选择一种形态进入。</span>
                     </div>
                     <button className="pixel-button compact-button" onClick={() => handleGenerateCourse()} disabled={isBusy}>
-                      转成学习路径
+                      生成学习包
                     </button>
                   </div>
                   <div className="toggle-row">
@@ -938,56 +1193,239 @@ export function LearningWorkbench() {
               )}
             </section>
 
-            <section className={activeStage === "path" ? "panel play-panel active-stage-panel" : "panel play-panel hidden-stage-panel"}>
+            <section className={activeStage === "learning_pack" ? "panel play-panel active-stage-panel" : "panel play-panel hidden-stage-panel"}>
               <div className="panel-head">
                 <div>
-                  <p className="eyebrow">3 LEARNING PATH</p>
-                  <h3>跟着下面的学习卡片操作</h3>
+                  <p className="eyebrow">3 LEARNING PACK</p>
+                  <h3>选择这份材料的学习形态</h3>
                 </div>
               </div>
-              {activeRun && currentActivity ? (
+              {activeRun && blueprint ? (
                 <>
-                  <div className="path-help-card">
-                    <div>
-                      <span className="help-kicker">第三步怎么用</span>
-                      <strong>往下看，写着“当前学习卡片”的白色区域，就是这一轮要读和操作的地方。</strong>
+                  <div className="learning-pack-summary">
+                    <span>学习包已生成</span>
+                    <strong>{blueprint.title}</strong>
+                    <p>{blueprint.cover.hook}</p>
+                    <div className="chip-row">
+                      <span>{blueprint.cover.chapter_count} 个章节</span>
+                      <span>{blueprint.cover.activity_count} 个学习项</span>
+                      <span>{blueprint.cover.estimated_minutes} 分钟</span>
                     </div>
-                    <ol className="path-help-steps">
-                      <li>
-                        <span>1</span>
-                        看下方“当前学习卡片”区域
-                      </li>
-                      <li>
-                        <span>2</span>
-                        在卡片底部选择、填写或确认把握
-                      </li>
-                      <li>
-                        <span>3</span>
-                        点卡片底部绿色按钮进入下一节点
-                      </li>
-                    </ol>
                   </div>
-                  <div className="progress-strip">
-                    <div className="progress-bar">
-                      <div style={{ width: `${Math.min(100, Math.round(progressRatio * 100))}%` }} />
+                  <div className="learning-mode-grid">
+                    {learningModes.map((mode) => (
+                      <article key={mode.id} className={selectedLearningMode === mode.id ? "learning-mode-card selected" : "learning-mode-card"}>
+                        <div>
+                          <span>{mode.itemCount} 个学习项</span>
+                          <strong>{mode.title}</strong>
+                          <p>{mode.description}</p>
+                        </div>
+                        <small>{mode.sourceCoverageLabel}</small>
+                        <button
+                          className="pixel-button compact-button"
+                          onClick={() => {
+                            setSelectedLearningMode(mode.id);
+                            setActiveStage("study_mode");
+                          }}
+                        >
+                          进入{mode.title}
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="empty-state">生成学习包后，这里会显示沉浸阅读、结构图和理解测验三种形态。</p>
+                  <div className="empty-action">
+                    <button className="pixel-button compact-button" disabled={isBusy || !analyzeResult} onClick={() => handleGenerateCourse()}>
+                      生成学习包
+                    </button>
+                  </div>
+                </>
+              )}
+            </section>
+
+            <section className={activeStage === "study_mode" ? "panel play-panel active-stage-panel" : "panel play-panel hidden-stage-panel"}>
+              {isFocusedStudyMode ? (
+                <div className="focus-study-header">
+                  <div>
+                    <span>专注学习中</span>
+                    <strong>{selectedLearningMode ? formatLearningMode(selectedLearningMode) : "学习模式"}</strong>
+                    <p>
+                      {selectedLearningMode === "structure_map"
+                        ? "只看这份材料的结构节点、原文依据和待验证问题。"
+                        : currentActivity
+                          ? `当前卡片：${currentActivity.title}`
+                          : blueprint?.title ?? "当前学习包"}
+                    </p>
+                  </div>
+                  <div className="focus-study-actions">
+                    {activeRun ? (
+                      <span>
+                        {activeRun.course_status === "completed"
+                          ? "已完成"
+                          : `${Math.min(activeRun.current_activity_index + 1, activities.length)} / ${activities.length}`}
+                      </span>
+                    ) : null}
+                    <button className="secondary-button compact-button" type="button" onClick={() => setActiveStage("learning_pack")}>
+                      回到学习包
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="panel-head">
+                  <div>
+                    <p className="eyebrow">4 STUDY MODE</p>
+                    <h3>{selectedLearningMode ? `正在学习：${formatLearningMode(selectedLearningMode)}` : "先选择一种学习形态"}</h3>
+                  </div>
+                </div>
+              )}
+              {activeRun && selectedLearningMode === "structure_map" && blueprint ? (
+                <>
+                  <div className="structure-study-panel">
+                    <div className="structure-map-board">
+                      <div className="structure-section-head">
+                        <span>材料结构图</span>
+                        <strong>先点节点，再看右侧的原文依据和检查问题</strong>
+                      </div>
+                      <div className="structure-node-list">
+                        {structureNodes.map((node, index) => {
+                          const nodeId = recordText(node, "id", recordText(node, "label", `node-${index}`));
+                          const label = recordText(node, "label", "结构节点");
+                          const detail = recordText(node, "detail", "系统从材料里抽出的结构说明。");
+                          const kind = formatGraphKind(recordText(node, "kind", "node"));
+                          const isSelected = selectedStructureNode ? node === selectedStructureNode : index === 0;
+
+                          return (
+                            <button
+                              key={nodeId}
+                              className={isSelected ? "structure-node selected" : "structure-node"}
+                              onClick={() => setSelectedStructureNodeId(nodeId)}
+                            >
+                              <span>{kind}</span>
+                              <strong>{label}</strong>
+                              <p>{detail}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <span>
-                      {Math.min(activeRun.current_activity_index + 1, activities.length)} / {activities.length}
-                    </span>
-                    <span className="status-pill">{activeRun.course_status === "completed" ? "已完成" : "学习中"}</span>
+                    <aside className="structure-inspector">
+                      <div className="activity-card-label">
+                        <span>当前结构节点</span>
+                        <strong>{selectedStructureNode ? recordText(selectedStructureNode, "label", "结构节点") : "等待结构节点"}</strong>
+                      </div>
+                      {selectedStructureNode ? (
+                        <>
+                          <div className="source-excerpt-box">
+                            <span>节点对应的材料依据</span>
+                            <p>{recordText(selectedStructureNode, "detail", "这部分来自系统对材料结构的抽取结果。")}</p>
+                          </div>
+                          <div className="source-reason-grid">
+                            <div>
+                              <span>结构角色</span>
+                              <strong>{formatGraphKind(recordText(selectedStructureNode, "kind", "node"))}</strong>
+                              <p>这个节点说明材料在这里承担的是问题、证据、前提、风险或结论中的一种角色。</p>
+                            </div>
+                            <div>
+                              <span>要验证什么</span>
+                              <strong>{selectedStructureQuestion ? recordText(selectedStructureQuestion, "prompt", "确认这个节点为什么重要。") : "确认这个节点为什么重要。"}</strong>
+                              <p>如果说不清这个问题，后面的测验会暴露出具体卡点。</p>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="empty-state small">这份材料还没有生成结构节点。</p>
+                      )}
+                      <div className="structure-concepts">
+                        <span>关键概念节点</span>
+                        <div className="chip-row">
+                          {conceptNodes.length
+                            ? conceptNodes.slice(0, 8).map((node, index) => (
+                                <span key={recordText(node, "id", recordText(node, "label", `concept-${index}`))}>
+                                  {recordText(node, "label", recordText(node, "term", "概念"))}
+                                </span>
+                              ))
+                            : blueprint.learning_representation.keywords.slice(0, 8).map((keyword) => <span key={keyword}>{keyword}</span>)}
+                        </div>
+                      </div>
+                      <div className="structure-next-action">
+                        <span>这一步完成标准</span>
+                        <strong>你能说清每个节点在材料里的作用，并知道下一步要验证哪个问题。</strong>
+                        <button
+                          className="pixel-button"
+                          onClick={() => {
+                            setSelectedLearningMode("quiz");
+                            setActiveStage("study_mode");
+                          }}
+                        >
+                          我看懂结构，进入理解测验
+                        </button>
+                      </div>
+                    </aside>
                   </div>
+                  {!isFocusedStudyMode ? (
+                    <div className="path-help-card">
+                      <div>
+                        <span className="help-kicker">结构图怎么用</span>
+                        <strong>不要把它当目录。它是材料的逻辑骨架：问题、证据、概念和待验证问题要同时看。</strong>
+                      </div>
+                      <ol className="path-help-steps">
+                        <li>
+                          <span>1</span>
+                          点左侧结构节点
+                        </li>
+                        <li>
+                          <span>2</span>
+                          看右侧材料依据和验证问题
+                        </li>
+                        <li>
+                          <span>3</span>
+                          进入测验，用回答检查自己是否真的理解
+                        </li>
+                      </ol>
+                    </div>
+                  ) : null}
+                </>
+              ) : activeRun && currentActivity && selectedLearningMode ? (
+                <>
                   <div className="activity-card">
                     <div className="activity-card-label">
                       <span>当前学习卡片</span>
-                      <strong>先看这里，再操作底部按钮</strong>
+                      <strong>先看材料依据，再操作底部按钮</strong>
                     </div>
                     <span className="activity-type">{formatActivityType(currentActivity.type)}</span>
                     <h4>{currentActivity.title}</h4>
+                    {currentActivitySource ? (
+                      <div className="activity-source-card">
+                        <div className="source-card-head">
+                          <span>这张卡来自材料哪里</span>
+                          <strong>{currentActivitySource.sectionHeading}</strong>
+                        </div>
+                        <div className="source-excerpt-box">
+                          <span>材料原文 / 解析片段</span>
+                          <p>{currentActivitySource.materialExcerpt}</p>
+                        </div>
+                        <div className="source-reason-grid">
+                          <div>
+                            <span>系统抽出的结构</span>
+                            <strong>{currentActivitySource.graphLabel}</strong>
+                            <p>{currentActivitySource.graphDetail}</p>
+                          </div>
+                          <div>
+                            <span>这一步要检查什么</span>
+                            <strong>{currentActivitySource.questionTarget}</strong>
+                            <p>{currentActivitySource.whyThisStep}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
                     <div className="current-action-card">
                       <span>这张卡片要你做的是</span>
                       <strong>{activityInstruction(currentActivity.type)}</strong>
                     </div>
-                    <p>{currentActivity.body}</p>
+                    {showCurrentActivityBody ? <p>{currentActivity.body}</p> : null}
                     {currentActivity.rubric?.passing_note ? <p className="learning-note">{currentActivity.rubric.passing_note}</p> : null}
                     {currentRubricFacets.length || currentRubricKeywords.length ? (
                       <div className="rubric-box">
@@ -1053,24 +1491,66 @@ export function LearningWorkbench() {
                       {activitySubmitLabel(currentActivity.type)}
                     </button>
                   </div>
-                  <div className="coach-console">
-                    <div className="coach-avatar">
-                      <span>PX</span>
+                  <div className="progress-strip">
+                    <div className="progress-bar">
+                      <div style={{ width: `${Math.min(100, Math.round(progressRatio * 100))}%` }} />
                     </div>
-                    <div>
-                      <p className="coach-role">学习引导</p>
-                      <p>{activeRun.latest_guide_message}</p>
-                    </div>
+                    <span>
+                      {Math.min(activeRun.current_activity_index + 1, activities.length)} / {activities.length}
+                    </span>
+                    <span className="status-pill">{activeRun.course_status === "completed" ? "已完成" : "学习中"}</span>
                   </div>
+                  {!isFocusedStudyMode ? (
+                    <>
+                      <div className="path-help-card">
+                        <div>
+                          <span className="help-kicker">学习卡片怎么用</span>
+                          <strong>上方写着“当前学习卡片”的白色区域，就是这一轮要读和操作的地方。</strong>
+                        </div>
+                        <ol className="path-help-steps">
+                          <li>
+                            <span>1</span>
+                            先看“材料原文 / 解析片段”
+                          </li>
+                          <li>
+                            <span>2</span>
+                            再看系统抽出的结构和检查目标
+                          </li>
+                          <li>
+                            <span>3</span>
+                            点卡片底部绿色按钮进入下一节点
+                          </li>
+                        </ol>
+                      </div>
+                      <div className="coach-console">
+                        <div className="coach-avatar">
+                          <span>PX</span>
+                        </div>
+                        <div>
+                          <p className="coach-role">学习引导</p>
+                          <p>{activeRun.latest_guide_message}</p>
+                        </div>
+                      </div>
+                    </>
+                  ) : null}
                 </>
               ) : activeRun && activeRun.course_status === "completed" ? (
-                <p className="empty-state">这轮课程已完成。右侧已经生成回访计划，下一步是复盘与迁移，而不是停在总结。</p>
+                <p className="empty-state">这轮学习已完成。复习页已经生成回访计划，下一步是复盘与迁移，而不是停在总结。</p>
+              ) : activeRun && !selectedLearningMode ? (
+                <>
+                  <p className="empty-state">学习包已经生成。先回到“学习包”页选择一种学习形态，再进入具体卡片。</p>
+                  <div className="empty-action">
+                    <button className="pixel-button compact-button" onClick={() => setActiveStage("learning_pack")}>
+                      去选择学习形态
+                    </button>
+                  </div>
+                </>
               ) : (
                 <>
-                  <p className="empty-state">把材料检索结果转成学习路径后，这里会出现第一个学习节点。</p>
+                  <p className="empty-state">把材料分析结果生成学习包后，这里会出现第一个学习项。</p>
                   <div className="empty-action">
                     <button className="pixel-button compact-button" disabled={isBusy || !analyzeResult} onClick={() => handleGenerateCourse()}>
-                      转成学习路径
+                      生成学习包
                     </button>
                   </div>
                 </>
@@ -1080,13 +1560,13 @@ export function LearningWorkbench() {
             <section className={activeStage === "review" ? "panel review-panel active-stage-panel" : "panel review-panel hidden-stage-panel"}>
               <div className="panel-head">
                 <div>
-                  <p className="eyebrow">4 REVIEW / HISTORY</p>
+                  <p className="eyebrow">5 REVIEW / HISTORY</p>
                   <h3>学习记录与后续复习</h3>
                 </div>
               </div>
               <div className="review-columns">
                 <div>
-                  <h4>历史课程</h4>
+                  <h4>历史学习包</h4>
                   <div className="history-list">
                     {runs.length ? (
                       runs.map((run) => (
@@ -1097,7 +1577,7 @@ export function LearningWorkbench() {
                         </button>
                       ))
                     ) : (
-                      <p className="empty-state small">还没有历史课程。</p>
+                      <p className="empty-state small">还没有历史学习包。</p>
                     )}
                   </div>
                 </div>
@@ -1111,13 +1591,21 @@ export function LearningWorkbench() {
                           <span>{plan.stage_label}</span>
                           <span>{relativeDue(plan.due_at)}</span>
                           <p>{plan.guide_message}</p>
+                          {plan.review_reasons.length ? (
+                            <div className="review-reasons">
+                              <span>为什么复习这些</span>
+                              {plan.review_reasons.map((reason) => (
+                                <p key={reason}>{reason}</p>
+                              ))}
+                            </div>
+                          ) : null}
                           <button className="secondary-button" onClick={() => handleCompleteReviewPlan(plan.id)} disabled={plan.status === "completed" || isBusy}>
                             {plan.status === "completed" ? "已完成" : "标记完成"}
                           </button>
                         </div>
                       ))
                     ) : (
-                      <p className="empty-state small">课程结束后，会自动生成 D+1 / D+3 / D+7 回访。</p>
+                      <p className="empty-state small">完成学习后，会自动生成 D+1 / D+3 / D+7 回访。</p>
                     )}
                   </div>
                 </div>

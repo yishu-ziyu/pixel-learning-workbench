@@ -1,5 +1,58 @@
 # 当前任务清单
 
+## 2026-05-06 专注学习模式与项目来源梳理
+
+- [x] 确认当前用户问题：进入具体学习板块后仍被全局流程、帮助块和引导模块打断，无法专注。
+- [x] 将具体学习模式改为专注界面：隐藏欢迎区、流程状态条、当前任务条、步骤意图面板和普通提示横幅。
+- [x] 在专注学习界面保留最小模式头、学习内容、源材料依据、操作按钮、进度和回到学习包入口。
+- [x] 在专注学习界面隐藏学习卡片帮助块、结构图帮助块和通用学习引导模块。
+- [x] 新增 `docs/project-origin-map.md`，梳理当前项目与 `learn-your-way`、`Focus Quiz`、`AI阅读教练`、`cognitive-reader` 等本地子项目的关系。
+- [x] 运行 Web lint/build、API 测试和浏览器可见验证。
+
+## 2026-05-05 Learn Your Way 目标重置
+
+- [x] 重新设定产品目标：`材料 -> 学习包 -> 可验证学习闭环`。
+- [x] 新增 `docs/learn-your-way-reset-prd.md`，写清产品定义、MVP 边界和验收标准。
+- [x] 新增 `docs/learn-your-way-ia-migration-plan.md`，把旧工作台迁移到串行流程。
+- [x] 新增 `docs/goal-completion-audit.md`，逐项映射目标、证据和剩余缺口。
+- [x] 将主界面推进为五步：输入材料、材料分析、学习包、开始学习、复习回访。
+- [x] 学习卡片显化来源：材料位置、原文/解析片段、结构节点和检查目标。
+- [x] 学习包页显化三种学习形态：沉浸阅读、结构图、理解测验。
+- [x] 选择理解测验后进入测验卡，而不是继续显示泛化情境卡。
+- [x] 将结构图模式补齐为真实可操作页面：结构节点、材料依据、结构角色、验证问题和关键概念。
+- [x] 将材料分析页补齐为显式材料封面：材料标题、摘要、来源、结构数和关键词数。
+- [x] 用真实 PDF 完成上传、解析、生成学习包并进入结构图学习模式。
+- [x] 补齐 Web URL 材料入口：前端输入网页地址，后端抓取 HTTP/HTTPS 正文并进入同一分析流程。
+- [x] 复习计划显化原因：错题、低把握、弱概念和误解线索会显示在 `为什么复习这些`。
+- [x] 将合作流程改成浏览器可见模式：每个步骤卡显示 `意图`，当前步骤面板显示 `当前步骤意图 / 用户现在要做什么 / 完成标准 / 可见证据`。
+- [x] 清理会直接误导用户的“课程化学习 / 学习路径”文案。
+- [x] 运行 API 测试、Web lint/build 和浏览器验证。
+- [x] 形成当前能力、缺口和下一步交付边界报告。
+
+### 当前验收结果
+
+- `pnpm --dir apps/web lint` 通过。
+- `pnpm --dir apps/web build` 通过。
+- `uv run --project apps/api pytest` 通过：9 passed，保留 FastAPI `on_event` 既有 deprecation warning。
+- 浏览器验证通过：输入材料 -> 材料分析 -> 学习包 -> 进入理解测验 -> 提交回答并看到反馈。
+- 二次浏览器验证通过：输入材料 -> 材料分析 -> 学习包 -> 进入结构图 -> 点击结构节点 -> 进入理解测验。
+- 真实 PDF 浏览器验证通过：上传 `华为慧通新零售管培生谈薪攻略.pdf` -> `pdf_text_layer` 解析 -> 学习包 -> 结构图。
+- Web URL 浏览器验证通过：输入页显示 `或者输入网页地址`，填写 `https://example.com/article` 后状态显示 `网页已就绪`。
+- 流程意图浏览器验证通过：页面显示 `当前步骤意图`、`用户现在要做什么`、`完成标准`、`可见证据`，每个流程卡显示 `意图：...`。
+- API URL 回归测试通过：`/api/assets` 接收 URL，`/api/assets/{id}/analyze` 返回 `parse_strategy=web_url` 和结构图。
+- 复习计划回归测试通过：低把握学习事件会进入 `review_reasons`。
+- 浏览器 console 验证：Errors 0，Warnings 0。
+- 截图产物：`pixel-reset-goal-learning-pack-flow-2026-05-05.png`。
+- 截图产物：`pixel-structure-map-panel-2026-05-06.png`、`pixel-structure-map-study-mode-2026-05-06.png`。
+- 截图产物：`pixel-material-analysis-cover-2026-05-06.png`、`pixel-real-pdf-structure-map-2026-05-06.png`。
+- 截图产物：`pixel-url-input-field-2026-05-06.png`。
+- 截图产物：`pixel-workflow-intent-panel-2026-05-06.png`。
+
+### 当前缺口
+
+- FastAPI `on_event` 仍有既有 deprecation warning，后续维护清理。
+- 仍沿用 `course-blueprint / course-run` 等内部 API 命名；本轮已在 `docs/learn-your-way-ia-migration-plan.md` 记录兼容边界，后续可加 alias route 再迁移。
+
 ## 2026-05-05 UI 收敛
 
 - [x] 确认 `~/.codex/AGENTS.md` 的 `quality_execution_guidelines` 已加载。
@@ -144,3 +197,14 @@
 - [x] 浏览器 console 验证：Errors 0，Warnings 0。
 - [x] 截图产物：`pixel-step3-card-anchor-top-2026-05-05.png`。
 - [x] 提交并推送。
+
+## 2026-05-05 学习卡片内容显化修复
+
+- [x] 确认根因：学习卡片显示为流程壳，后端活动没有携带材料来源、原文片段、结构节点和学习问题。
+- [x] 后端活动新增 `source_context`，把检索结果带入每个学习节点。
+- [x] 前端学习卡片新增材料来源区：来自哪里、原文/解析片段、系统抽出的结构、这一步要检查什么。
+- [x] 兼容旧课程：如果活动没有 `source_context`，前端从 `learning_representation` 里 fallback 补齐。
+- [x] 清理旧的空泛 `scene` 正文和“情境卡”指令，让当前任务直接指向材料片段和结构节点。
+- [x] 调整第 3 步布局顺序：先展示“当前学习卡片”，再展示进度、操作说明和学习引导。
+- [x] 运行 API 测试、Web lint/build 和浏览器验证。
+- [ ] 提交并推送。

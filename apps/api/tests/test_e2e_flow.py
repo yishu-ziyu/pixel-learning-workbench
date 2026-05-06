@@ -83,7 +83,7 @@ def test_text_to_review_plan_flow(tmp_path) -> None:
                 "activity_id": first_activity["id"],
                 "activity_type": first_activity["type"],
                 "answer": {},
-                "confidence": "medium",
+                "confidence": "low",
                 "duration_seconds": 30,
             },
             headers=headers,
@@ -95,6 +95,7 @@ def test_text_to_review_plan_flow(tmp_path) -> None:
         assert review_response.status_code == 200
         reviews = review_response.json()
         assert [item["stage_label"] for item in reviews] == ["D+1 回访", "D+3 强化", "D+7 迁移"]
+        assert any("低把握记录" in reason for reason in reviews[0]["review_reasons"])
 
         complete_review_response = client.post(f"/api/review-plans/{reviews[0]['id']}/complete", headers=headers)
         assert complete_review_response.status_code == 200
@@ -111,5 +112,51 @@ def test_text_to_review_plan_flow(tmp_path) -> None:
             "d1_review_completed",
         ]
         assert all(step["reached"] for step in funnel["steps"])
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_web_url_asset_can_be_analyzed(tmp_path, monkeypatch) -> None:
+    engine = create_engine(f"sqlite:///{tmp_path / 'url.sqlite3'}", connect_args={"check_same_thread": False})
+    TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
+    Base.metadata.create_all(bind=engine)
+
+    def override_get_db() -> Generator[Session, None, None]:
+        db = TestingSessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    monkeypatch.setattr(
+        "app.services.parser.fetch_web_text",
+        lambda url: """
+        Abstract
+        This source document explains how learners convert one web article into reading, structure mapping, and quiz practice.
+        Introduction
+        The product keeps every generated question tied to visible evidence from the original page.
+        Results
+        Learners can inspect the source section, answer a check, and later review weak concepts.
+        """,
+    )
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        client = TestClient(app)
+        magic_response = client.post("/api/auth/request-magic-link", json={"email": "learner@example.com"})
+        preview_token = magic_response.json()["preview_token"]
+        session_response = client.post("/api/auth/verify", json={"token": preview_token})
+        headers = {"Authorization": f"Bearer {session_response.json()['session_token']}"}
+
+        asset_response = client.post("/api/assets", data={"url": "https://example.com/source"}, headers=headers)
+        assert asset_response.status_code == 200
+        assert asset_response.json()["source_type"] == "url"
+
+        analyze_response = client.post(f"/api/assets/{asset_response.json()['asset_id']}/analyze", headers=headers)
+        assert analyze_response.status_code == 200
+        analyzed = analyze_response.json()
+        assert analyzed["parsed_document"]["parse_strategy"] == "web_url"
+        assert analyzed["parsed_document"]["metadata"]["source_name"] == "https://example.com/source"
+        assert analyzed["learning_representation"]["argument_graph"]
     finally:
         app.dependency_overrides.clear()

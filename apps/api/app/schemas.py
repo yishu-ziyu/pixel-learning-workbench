@@ -135,6 +135,7 @@ class ReviewPlanItem(BaseModel):
     due_at: datetime
     status: str
     guide_message: str
+    review_reasons: list[str] = Field(default_factory=list)
 
 
 class ProductEventRequest(BaseModel):

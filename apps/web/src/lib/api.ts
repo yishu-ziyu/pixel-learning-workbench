@@ -55,9 +55,10 @@ export function verifyMagicLink(token: string): Promise<SessionResponse> {
   });
 }
 
-export function createAsset(input: { text?: string; file?: File }, sessionToken: string): Promise<AssetCreateResponse> {
+export function createAsset(input: { text?: string; url?: string; file?: File }, sessionToken: string): Promise<AssetCreateResponse> {
   const formData = new FormData();
   if (input.text) formData.append("text", input.text);
+  if (input.url) formData.append("url", input.url);
   if (input.file) formData.append("file", input.file);
   return request<AssetCreateResponse>("/assets", { method: "POST", body: formData }, sessionToken);
 }

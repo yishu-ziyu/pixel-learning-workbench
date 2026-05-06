@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import re
 import subprocess
+from html.parser import HTMLParser
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -11,6 +14,28 @@ from pypdf import PdfReader
 from app.schemas import ParsedDocument, ParsedSection
 
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt", ".md"}
+
+
+class _ReadableHTMLParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self._skip_depth = 0
+        self.chunks: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in {"script", "style", "noscript", "svg"}:
+            self._skip_depth += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in {"script", "style", "noscript", "svg"} and self._skip_depth:
+            self._skip_depth -= 1
+
+    def handle_data(self, data: str) -> None:
+        if self._skip_depth:
+            return
+        normalized = re.sub(r"\s+", " ", data).strip()
+        if normalized:
+            self.chunks.append(normalized)
 
 
 def detect_language(text: str) -> str:
@@ -96,6 +121,38 @@ def parse_plain_text(text: str, *, source_name: str = "文本输入", parse_stra
         doc_type_guess=doc_type,  # type: ignore[arg-type]
         parse_strategy=parse_strategy,
     )
+
+
+def extract_readable_html(html: str) -> str:
+    parser = _ReadableHTMLParser()
+    parser.feed(html)
+    return "\n".join(parser.chunks)
+
+
+def fetch_web_text(url: str) -> str:
+    parsed = urlparse(url.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("请输入有效的 http 或 https 网页地址。")
+    if parsed.hostname in {"localhost", "127.0.0.1", "::1"}:
+        raise ValueError("暂不支持抓取本机地址。")
+
+    request = Request(url, headers={"User-Agent": "PixelMaterialLearningConverter/0.1"})
+    with urlopen(request, timeout=8) as response:  # noqa: S310 - user-provided learning URL, constrained by scheme above.
+        content_type = response.headers.get("content-type", "")
+        raw = response.read(1_200_000)
+    charset_match = re.search(r"charset=([\w-]+)", content_type, re.I)
+    encoding = charset_match.group(1) if charset_match else "utf-8"
+    html = raw.decode(encoding, errors="ignore")
+    if "html" in content_type.lower() or "<html" in html.lower():
+        return extract_readable_html(html)
+    return html
+
+
+def parse_web_url(url: str) -> ParsedDocument:
+    text = fetch_web_text(url)
+    if len(text.strip()) < 120:
+        raise ValueError("网页可提取文本过少，请换一个正文更完整的链接或粘贴文本。")
+    return parse_plain_text(text, source_name=url.strip(), parse_strategy="web_url")
 
 
 def parse_docx(path: Path) -> ParsedDocument:

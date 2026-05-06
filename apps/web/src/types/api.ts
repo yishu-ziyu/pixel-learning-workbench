@@ -63,6 +63,14 @@ export interface Activity {
   title: string;
   body: string;
   skill_ids: string[];
+  source_context?: {
+    section_heading?: string;
+    material_excerpt?: string;
+    graph_label?: string;
+    graph_detail?: string;
+    question_target?: string;
+    why_this_step?: string;
+  };
   key_points?: string[];
   expected_keywords?: string[];
   rubric?: {
@@ -157,6 +165,7 @@ export interface ReviewPlanItem {
   due_at: string;
   status: string;
   guide_message: string;
+  review_reasons: string[];
 }
 
 export type ProductEventName = "first_run_sample_started" | "material_parsed" | "path_generated" | "first_activity_completed" | "d1_review_completed";

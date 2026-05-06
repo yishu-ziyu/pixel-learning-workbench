@@ -9,9 +9,9 @@ from app.schemas import ProductEventName
 
 
 FUNNEL_STEPS: tuple[tuple[ProductEventName, str], ...] = (
-    ("first_run_sample_started", "打开示例课"),
+    ("first_run_sample_started", "打开示例材料"),
     ("material_parsed", "材料解析完成"),
-    ("path_generated", "学习路径生成"),
+    ("path_generated", "学习包生成"),
     ("first_activity_completed", "完成首个学习节点"),
     ("d1_review_completed", "完成 D+1 回访"),
 )

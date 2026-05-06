@@ -2,14 +2,14 @@
 
 ## Product Context
 
-This is a workbench for deep reading. The user brings one source material, then the product turns it into a visible structure, a learning path, active practice, and a review loop.
+This is a material learning converter for deep reading. The user brings one source material, then the product turns it into a learning pack with multiple study representations, active practice, and a review loop.
 
 The interface must feel like a focused study instrument, not a course marketplace, chat toy, or abstract dashboard.
 
 ## Product Promise
 
 ```text
-Input material -> Retrieve structure -> Convert to learning path -> Practice and review
+Input material -> Analyze structure -> Generate learning pack -> Pick one study mode -> Practice and review
 ```
 
 Every screen should answer three questions quickly:
@@ -60,7 +60,7 @@ Color should communicate state and action priority. It should not become a decor
 - Primary button appears once per task area.
 - Empty states must include the next useful action when one exists.
 - Inputs show readiness, not just a blank box.
-- Generated results should be inspectable before the next transformation step.
+- Generated learning-pack modes should be inspectable before the user enters one mode.
 - Review/history should not compete with the current material task.
 
 ## Motion
@@ -71,9 +71,9 @@ Use only subtle hover and state feedback. No decorative motion in the core learn
 
 This project is not App Store ready until these are true:
 
-- A first-time user can start a full sample lesson in one click.
+- A first-time user can start from a sample material in one click.
 - The product category is understandable in the first viewport.
 - The logged-in workspace always exposes one primary next action.
-- The source material, retrieval result, learning activity, and review state are visually separated.
+- The source material, analysis result, learning pack, active study mode, and review state are visually separated.
 - Mobile layout is a designed sequence, not a compressed desktop dashboard.
 - The core loop has automated smoke tests and browser-level QA evidence.
